@@ -4,9 +4,28 @@ import axios from 'axios';
 
 const API_URL = 'http://localhost:3001/api';
 
+interface Page {
+  pageNumber: number;
+  type: 'photo' | 'story';
+  text: string;
+  imageUrl?: string;
+  url?: string;
+  prompt: string;
+}
+
+interface Book {
+  _id: string;
+  title: string;
+  childName: string;
+  pages: Page[];
+  status: string;
+  photoUrl?: string;
+  pdfUrl?: string;
+}
+
 export default function PrintTemplate() {
-  const { bookId } = useParams();
-  const [book, setBook] = useState<any>(null);
+  const { bookId } = useParams<{ bookId: string }>();
+  const [book, setBook] = useState<Book | null>(null);
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -222,7 +241,7 @@ export default function PrintTemplate() {
       </div>
 
       {/* RENDER PAGES */}
-      {book.pages.map((p: any, i: number) => (
+      {book.pages.map((p: Page, i: number) => (
         <div key={i} className="page">
           {p.type === 'photo' ? (
             <>

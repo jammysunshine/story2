@@ -233,7 +233,11 @@ app.post('/api/create-checkout', async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-app.listen(port, () => {
-  logger.info(`🚀 Engine Server running at http://localhost:${port}`);
-  connectDB().catch(console.error);
+connectDB().then(() => {
+  app.listen(port, () => {
+    logger.info(`🚀 Engine Server running at http://localhost:${port}`);
+  });
+}).catch(err => {
+  logger.error('Failed to connect to MongoDB:', err.message);
+  process.exit(1);
 });

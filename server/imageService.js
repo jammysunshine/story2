@@ -166,13 +166,6 @@ async function generateImages(db, bookId, isFulfillment = false) {
     error: (msg, meta) => logger.error(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
   };
 
-  giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
-  giLog.info(`🎯 Params: { pagesCount: ${pages.length}, isFulfillment: ${isFulfillment} }`);
-  giLog.info(`🎯 Auth Status: { authenticated: ${userEmail !== 'none'}, user: "${userEmail}" }`);
-
-  giLog.info(`🎯 Function execution continuing, book found`);
-  giLog.info(`🎯 DB Record Status: { status: "${bookRecord.status}", currentPages: ${bookRecord.pages?.length}, isDigitalUnlocked: ${bookRecord.isDigitalUnlocked} }`);
-
   const activeHeroBible = bookRecord.heroBible || '';
   const activeAnimalBible = bookRecord.animalBible || '';
 
@@ -183,6 +176,13 @@ async function generateImages(db, bookId, isFulfillment = false) {
     .slice(0, storyPagesCount)
     .map((p) => ({ ...p, type: 'story' }));
   const pages = storyPagesOnly;
+
+  giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
+  giLog.info(`🎯 Params: { pagesCount: ${pages.length}, isFulfillment: ${isFulfillment} }`);
+  giLog.info(`🎯 Auth Status: { authenticated: ${userEmail !== 'none'}, user: "${userEmail}" }`);
+
+  giLog.info(`🎯 Function execution continuing, book found`);
+  giLog.info(`🎯 DB Record Status: { status: "${bookRecord.status}", currentPages: ${bookRecord.pages?.length}, isDigitalUnlocked: ${bookRecord.isDigitalUnlocked} }`);
 
   giLog.info(`📄 Number of Story Pages to Process: ${pages.length}`);
   if (pages.length < 5) {
@@ -301,6 +301,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
     try {
       if (!urlStr) return null;
       const url = new URL(urlStr);
+      // Correctly escaped regex to match leading slash
       return `gs://${url.pathname.replace(/^\//, '')}`;
     } catch (e) {
       const parts = urlStr.split('storage.googleapis.com/')[1];
