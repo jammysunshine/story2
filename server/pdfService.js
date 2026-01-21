@@ -43,6 +43,7 @@ async function generatePdf(db, bookId) {
     throw new Error('Book not found');
   }
 
+  // --- 100% ORIGINAL GCS PRE-FLIGHT CHECK ---
   const projectId = process.env.GCP_PROJECT_ID;
   logger.info(`🔍 [PDF_GEN_DEBUG] Project ID: "${projectId}"`);
   const storage = new Storage({ projectId: projectId || undefined });
@@ -97,6 +98,7 @@ async function generatePdf(db, bookId) {
     waited += pollInterval;
   }
 
+  // --- 100% ORIGINAL PUPPETEER LAUNCH ARGS ---
   const chromePath = process.platform === 'darwin' 
     ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' 
     : '/usr/bin/chromium';
@@ -109,11 +111,19 @@ async function generatePdf(db, bookId) {
     executablePath: chromePath,
     headless: 'new',
     args: [
-      '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-      '--disable-gpu', '--no-zygote', '--single-process', '--no-first-run',
-      '--disable-extensions', '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
-      '--disable-web-security', `--user-data-dir=/tmp/chrome-${crypto.randomUUID()}`,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-zygote',
+      '--single-process',
+      '--no-first-run',
+      '--disable-extensions',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-web-security',
+      `--user-data-dir=/tmp/chrome-${crypto.randomUUID()}`,
     ],
   });
 
@@ -133,28 +143,37 @@ async function generatePdf(db, bookId) {
 
     page.on('console', (msg) => logger.info('PAGE CONSOLE:', msg.text()));
 
-    await page.setViewport({ width: 2400, height: 3300, deviceScaleFactor: 1 });
+    await page.setViewport({
+      width: 2400,
+      height: 3300,
+      deviceScaleFactor: 1,
+    });
 
     const mergedPdf = await PDFDocument.create();
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    const totalActualPages = book.pages.length + 1;
+    const storyPageCount = book.pages.length;
+    const totalActualPages = storyPageCount + 1; // +1 for Title Page
     const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');
 
     logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
     const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
     
-    await page.goto(fullTemplateUrl, { waitUntil: 'networkidle0', timeout: 120000 });
+    await page.goto(fullTemplateUrl, {
+      waitUntil: 'networkidle0',
+      timeout: 120000
+    });
 
     logger.info('⏳ Waiting for all images to load in browser...');
     const imageStatus = await page.evaluate(async () => {
       const images = Array.from(document.querySelectorAll('img'));
-      return await Promise.all(images.map(img => {
+      const results = await Promise.all(images.map(img => {
         if (img.complete) return Promise.resolve({ src: img.src, status: 'already_complete' });
         return new Promise(resolve => {
           img.onload = () => resolve({ src: img.src, status: 'loaded' });
           img.onerror = () => resolve({ src: img.src, status: 'error' });
         });
       }));
+      return results;
     });
 
     const failedImages = imageStatus.filter((s) => s.status === 'error');
@@ -181,7 +200,7 @@ async function generatePdf(db, bookId) {
             if (img) {
               try {
                 if (img.src && img.src !== 'none') {
-                  await img.decode();
+                  await img.decode(); // FORCE CHROME TO FINISH RENDERING PIXELS
                   currentImgInfo.decoded = true;
                 }
               } catch (e) {
@@ -204,7 +223,9 @@ async function generatePdf(db, bookId) {
       await sleep(500);
 
       const pagePdfBuffer = await page.pdf({
-        width: '8in', height: '11in', printBackground: true,
+        width: '8in',
+        height: '11in',
+        printBackground: true,
         margin: { top: '0', right: '0', bottom: '0', left: '0' }
       });
 
