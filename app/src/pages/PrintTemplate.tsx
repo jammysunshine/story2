@@ -36,6 +36,7 @@ export default function PrintTemplate() {
       };
       autofit();
       window.addEventListener('load', autofit);
+      if (document.readyState === 'complete') autofit();
       return () => window.removeEventListener('load', autofit);
     }
   }, [book]);
@@ -48,13 +49,17 @@ export default function PrintTemplate() {
     <div className="print-body">
       <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,800;1,400&display=swap" rel="stylesheet" />
       <style>{`
+        header, nav, footer, .header-container, #header, button, .sign-in-btn { 
+          display: none !important; 
+        }
         @page { size: 8in 11in; margin: 0; }
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; }
-        .print-body { 
+        html, body { 
           margin: 0 !important; 
           padding: 0 !important; 
           background: white; 
           width: 8in; 
+          overflow: visible !important;
           font-family: 'EB Garamond', serif;
         }
         .page {
@@ -62,9 +67,7 @@ export default function PrintTemplate() {
           height: 11in;
           position: relative;
           overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+          display: block;
           margin: 0 !important;
           padding: 0.5in !important;
           page-break-after: always;
@@ -78,6 +81,8 @@ export default function PrintTemplate() {
           right: 0.4in;
           bottom: 0.3in;
           border: 1px solid #E5E7EB;
+          background-color: transparent;
+          pointer-events: none;
           border-radius: 0.25in;
           z-index: 1;
         }
@@ -229,6 +234,7 @@ export default function PrintTemplate() {
                     alt="The Hero" 
                     className="inner-image" 
                     style={{ borderRadius: '50%' }} 
+                    crossOrigin="anonymous"
                   />
                 </div>
                 <p className="child-name-pop" style={{ marginTop: '0.5in' }}>{book.childName}</p>
@@ -250,6 +256,7 @@ export default function PrintTemplate() {
                   src={p.imageUrl}
                   alt={`Page ${p.pageNumber}`}
                   className="inner-image"
+                  crossOrigin="anonymous"
                 />
               </div>
               <div className="footer-area">
