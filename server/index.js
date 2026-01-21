@@ -9,6 +9,8 @@ const axios = require('axios');
 const { Storage } = require('@google-cloud/storage');
 const { OAuth2Client } = require('google-auth-library');
 const { sendStoryEmail } = require('./mail');
+const { generateImages } = require('./imageService');
+const { generatePdf, get7DaySignedUrl } = require('./pdfService');
 const logger = require('./logger');
 
 dotenv.config();
@@ -150,44 +152,8 @@ app.post('/api/generate-story', async (req, res) => {
 
 app.post('/api/generate-images', async (req, res) => {
   const { bookId } = req.body;
-  const pid = process.pid;
-  logger.info(`🎯 ========== IMAGE GENERATION STARTED [PID:${pid}] ==========`);
-  
-  const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
-  if (!book) {
-    logger.error(`🎯 Book not found: ${bookId}`);
-    return res.status(404).json({ error: 'Book not found' });
-  }
-
-  logger.info(`🎯 DB Record Status: { status: "${book.status}", pages: ${book.pages?.length} }`);
   res.json({ success: true, message: 'Painting started' });
-
-  (async () => {
-    try {
-      for (let i = 0; i < book.pages.length; i++) {
-        const page = book.pages[i];
-        logger.info(`🎨 [Page ${i + 1}] Starting painting cycle...`);
-        
-        const url = await generateImageRace(`Style: ${book.characterStyle}. ${page.prompt}`, bookId, i + 1);
-        
-        if (url) {
-          await db.collection('books').updateOne(
-            { _id: new ObjectId(bookId) }, 
-            { $set: { [`pages.${i}.imageUrl`]: url } }
-          );
-          logger.info(`✅ [Page ${i + 1}] Success! Image saved.`);
-        } else {
-          logger.warn(`⚠️ [Page ${i + 1}] Painting failed or returned no URL.`);
-        }
-      }
-      
-      await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { status: 'illustrated' } });
-      logger.info(`🎯 [GenerateImages][PID:${pid}] Execution complete.`);
-      logger.info(`✨ Book ${bookId} fully illustrated.`);
-    } catch (err) {
-      logger.error(`💥 [GenerateImages][PID:${pid}] Fatal error:`, err.message);
-    }
-  })();
+  generateImages(db, bookId).catch(err => logger.error('Image gen failed:', err.message));
 });
 
 app.get('/api/orders', async (req, res) => {
@@ -202,7 +168,19 @@ app.get('/api/book-status', async (req, res) => {
   const { bookId } = req.query;
   const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
   const securedPages = await Promise.all(book.pages.map(async p => ({ ...p, imageUrl: await getSignedUrl(p.imageUrl) })));
-  res.json({ status: book.status, pages: securedPages, pdfUrl: await getSignedUrl(book.pdfUrl) });
+  res.json({ status: book.status, pages: securedPages, pdfUrl: await get7DaySignedUrl(book.pdfUrl) });
+});
+
+app.post('/api/generate-pdf', async (req, res) => {
+  const { bookId } = req.body;
+  try {
+    const pdfUrl = await generatePdf(db, bookId);
+    const signedUrl = await get7DaySignedUrl(pdfUrl);
+    res.json({ success: true, pdfUrl: signedUrl });
+  } catch (error) {
+    logger.error('PDF generation failed:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
