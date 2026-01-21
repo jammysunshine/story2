@@ -9,9 +9,6 @@ const STORY_REF_TIMEOUT_MS = parseInt(process.env.STORY_REF_TIMEOUT_MS || "12000
 const STORY_BATCH_DELAY_MS = parseInt(process.env.STORY_BATCH_DELAY_MS || "90000");
 const TEASER_LIMIT = 7;
 
-/**
- * Helper to convert storage URLs to gs:// URIs for Gemini
- */
 const getGcsUriFromUrl = (urlStr) => {
   try {
     if (!urlStr) return null;
@@ -32,7 +29,6 @@ async function callGeminiImageGen(params) {
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-3-pro-image-preview" });
-
     const parts = [{ text: prompt }];
 
     if (referenceImages && referenceImages.length > 0) {
@@ -62,8 +58,13 @@ async function callGeminiImageGen(params) {
     }
 
     const imagePart = response.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
-    return imagePart?.inlineData?.data || null;
+    if (imagePart?.inlineData?.data) {
+        logger.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`);
+        return imagePart.inlineData.data;
+    }
+    return null;
   } catch (err) {
+    logger.error(`💥 [Page ${pageNumber}] Gemini Pro error: ${err.message}`);
     throw err;
   }
 }
@@ -78,10 +79,7 @@ async function paintPageWithRace(params) {
     try {
       const runners = Array.from({ length: concurrency }).map(async (_, idx) => {
         return await callGeminiImageGen({
-          prompt,
-          referenceImages,
-          pageNumber: `${pageNumber}_r${idx}`,
-          bucket
+          prompt, referenceImages, pageNumber: `${pageNumber}_att${attempt}_r${idx}`, bucket
         });
       });
 
@@ -97,14 +95,12 @@ async function paintPageWithRace(params) {
         await file.save(buffer, { metadata: { contentType: "image/png" } });
         
         const [signedUrl] = await file.getSignedUrl({
-            version: 'v4',
-            action: 'read',
-            expires: Date.now() + 60 * 60 * 1000,
+            version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000,
         });
         return signedUrl;
       }
     } catch (e) {
-      logger.warn(`⚠️ [Page ${pageNumber}] Race failed: ${e.message}`);
+      logger.warn(`⚠️ [Page ${pageNumber}] Race attempt failed: ${e.message}`);
       attempt++;
       if (attempt < STORY_REF_RETRIES) await new Promise(r => setTimeout(r, 10000));
     }
@@ -114,7 +110,8 @@ async function paintPageWithRace(params) {
 
 async function generateImages(db, bookId, isFulfillment = false) {
   const pid = process.pid;
-  logger.info(`🎯 ========== FULL ENGINE STARTED [PID:${pid}] ==========`);
+  logger.info(`🎯 ========== FUNCTION STARTED [PID:${pid}] ==========`);
+  logger.info(`🎯 Params: { bookId: ${bookId}, isFulfillment: ${isFulfillment} }`);
 
   const book = await db.collection("books").findOne({ _id: new ObjectId(bookId) });
   if (!book) throw new Error("Book not found");
@@ -122,8 +119,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
   const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
   const bucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
 
-  // 1. RESOLVE CHARACTER PORTRAITS
-  logger.info("📸 STEP 1: RESOLVING REFERENCE PORTRAITS");
+  logger.info(`🎯 DB Record Status: { status: "${book.status}", pages: ${book.pages?.length} }`);
+
+  // 1. CHARACTER PORTRAITS
+  logger.info("📸 STEP 1: RESOLVING REFERENCE IMAGES (PARALLEL MEGA-RACE)");
   
   const heroPrompt = `${book.heroBible}. Professional storybook illustration, ${book.characterStyle}. Centered character portrait, neutral expression, front view.`;
   const animalPrompt = `${book.animalBible}. Professional storybook illustration, ${book.characterStyle}. Centered animal portrait, neutral expression, front view.`;
@@ -133,7 +132,6 @@ async function generateImages(db, bookId, isFulfillment = false) {
     paintPageWithRace({ bookId, pageNumber: 'animal_ref', prompt: animalPrompt, bucket, concurrency: 2 })
   ]);
 
-  // SYNC REFERENCES TO IMAGES COLLECTION
   const syncRef = async (type, url) => {
       if (!url) return;
       await db.collection('images').updateOne(
@@ -144,49 +142,34 @@ async function generateImages(db, bookId, isFulfillment = false) {
   };
   await Promise.all([syncRef('hero', heroRefUrl), syncRef('animal', animalRefUrl)]);
 
-  // 2. CONSTRUCT MASTER ARRAY
-  logger.info("🏗️ STEP 2: CONSTRUCTING MASTER ARRAY");
+  // 2. MASTER ARRAY
+  logger.info("🏗️ STEP 2: CONSTRUCTING MASTER ARRAY (27 Pages)");
   const masterPages = [];
-  
-  if (book.photoUrl) {
-    masterPages.push({
-      pageNumber: 1, type: 'photo',
-      text: `Look, here is the real you! Ready to start the story?`,
-      url: book.photoUrl, imageUrl: book.photoUrl,
-      prompt: `The real photo of the child`
-    });
-  } else {
-    masterPages.push({
-      pageNumber: 1, type: 'photo',
-      text: `Look, here is you as a storybook hero! Ready to start?`,
-      url: heroRefUrl, imageUrl: heroRefUrl,
-      prompt: `Stylized character portrait`
-    });
-  }
-
+  masterPages.push({
+    pageNumber: 1, type: 'photo',
+    text: book.photoUrl ? `Look, here is the real you!` : `Look, here is you as a storybook hero!`,
+    imageUrl: book.photoUrl || heroRefUrl, prompt: `Portrait of the child hero`
+  });
   masterPages.push({
     pageNumber: 2, type: 'story',
     text: `Once upon a time, your adventure began right here in the ${book.location}!`,
     prompt: `Hero standing in ${book.location}, looking excited.`
   });
-
   masterPages.push({
     pageNumber: 3, type: 'story',
     text: `Meet your brave friend, the ${book.animal}!`,
-    imageUrl: animalRefUrl,
-    prompt: `Portrait of the animal friend`
+    imageUrl: animalRefUrl, prompt: `Portrait of the animal friend`
   });
-
   book.pages.forEach((p, idx) => {
     masterPages.push({ ...p, type: 'story', pageNumber: idx + 4 });
   });
-
   masterPages.push({
     pageNumber: masterPages.length + 1, type: 'story',
     text: "The End. May your adventures never truly end!",
     prompt: book.finalPrompt || `Heartwarming final scene.`
   });
 
+  logger.info(`💾 Initializing DB with master array structure...`);
   await db.collection('books').updateOne(
     { _id: new ObjectId(bookId) },
     { $set: { pages: masterPages, updatedAt: new Date() } }
@@ -198,16 +181,16 @@ async function generateImages(db, bookId, isFulfillment = false) {
   if (heroUri) referenceImages.push({ uri: heroUri });
   if (animalUri) referenceImages.push({ uri: animalUri });
 
-  // 3. PAINTING BATCHES
+  // 3. PAINTING
   const paintPage = async (idx) => {
     const page = masterPages[idx];
-    if (page.imageUrl && !page.imageUrl.includes('placeholder') && !page.imageUrl.includes('via.placeholder')) return;
+    if (page.imageUrl && !page.imageUrl.includes('placeholder')) return;
 
-    let charInstr = `Ref 1 is the child hero. Ref 2 is their animal friend. Refer to these for visual consistency. Depict both interacting naturally.`;
-    if (page.pageNumber === 2) charInstr = `Refer to Ref 1 for the child's appearance. Only the child hero should be in this scene.`;
+    logger.info(`🎨 [Page ${page.pageNumber}] Starting painting cycle...`);
+    let charInstr = `Ref 1 is child, Ref 2 is animal. Visual consistency.`;
+    if (page.pageNumber === 2) charInstr = `Ref 1 is the child. Only the child.`;
 
-    const prompt = `Wholesome children's book illustration. Style: ${book.characterStyle}. ${book.heroBible} ${book.animalBible}. ${charInstr} Scene: ${page.prompt}`;
-    
+    const prompt = `Style: ${book.characterStyle}. ${book.heroBible} ${book.animalBible}. ${charInstr} Scene: ${page.prompt}`;
     const signedUrl = await paintPageWithRace({ bookId, pageNumber: page.pageNumber, prompt, referenceImages, bucket });
     
     if (signedUrl) {
@@ -227,10 +210,13 @@ async function generateImages(db, bookId, isFulfillment = false) {
     }
   };
 
+  logger.info(`🚀 FIRING TEASER BATCH: Pages 1-7...`);
   const teaserIndices = masterPages.map((_, i) => i).filter(i => i < TEASER_LIMIT);
   await Promise.all(teaserIndices.map(idx => paintPage(idx)));
+  logger.info(`✅ TEASER BATCH COMPLETE.`);
 
   if (isFulfillment) {
+    logger.info(`🚀 FIRING REGULAR BATCHES...`);
     const regularIndices = masterPages.map((_, i) => i).filter(i => i >= TEASER_LIMIT);
     const BATCH_SIZE = 18;
     for (let i = 0; i < regularIndices.length; i += BATCH_SIZE) {
@@ -244,21 +230,21 @@ async function generateImages(db, bookId, isFulfillment = false) {
     }
   }
 
-  // FINAL SYNC
-  const finalBook = await db.collection('books').findOneAndUpdate(
+  const finalStatus = isFulfillment ? 'preview' : 'teaser';
+  await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
-      { $set: { status: isFulfillment ? 'preview' : 'teaser', updatedAt: new Date() } },
-      { returnDocument: 'after' }
+      { $set: { status: finalStatus, updatedAt: new Date() } }
   );
 
   if (book.email) {
       await db.collection('users').updateOne(
           { email: book.email.toLowerCase(), "recentBooks.id": bookId },
-          { $set: { "recentBooks.$.status": finalBook.value?.status || 'teaser', updatedAt: new Date() } }
+          { $set: { "recentBooks.$.status": finalStatus, updatedAt: new Date() } }
       ).catch(e => logger.error('User sync fail:', e.message));
   }
 
-  logger.info(`🎯 [GenerateImages] Execution complete for Book: ${bookId}`);
+  logger.info(`🎯 [LIFECYCLE_TRACKER] PAINTING_COMPLETE: Book ${bookId}`);
+  logger.info(`🎯 [GenerateImages][PID:${pid}] Execution complete.`);
 }
 
 module.exports = { generateImages };
