@@ -167,8 +167,8 @@ async function generateImages(db, bookId, isFulfillment = false) {
   };
 
   giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
-  giLog.info(`🎯 Params: { pagesCount: unknown, isFulfillment: ${isFulfillment} }`);
-  giLog.info(`🎯 Auth Status: { authenticated: true, user: "${userEmail}" }`);
+  giLog.info(`🎯 Params: { pagesCount: ${pages.length}, isFulfillment: ${isFulfillment} }`);
+  giLog.info(`🎯 Auth Status: { authenticated: ${userEmail !== 'none'}, user: "${userEmail}" }`);
 
   giLog.info(`🎯 Function execution continuing, book found`);
   giLog.info(`🎯 DB Record Status: { status: "${bookRecord.status}", currentPages: ${bookRecord.pages?.length}, isDigitalUnlocked: ${bookRecord.isDigitalUnlocked} }`);
@@ -414,22 +414,47 @@ async function generateImages(db, bookId, isFulfillment = false) {
   try {
     giLog.info(`💾 ========== STEP 4: FINALIZING BOOK DOCUMENT ==========`);
     giLog.info(`Updating Book: ${bookId} with ${updatedPages.length} images`);
-    
+
+    const updateData = {
+      pages: updatedPages,
+      updatedAt: new Date()
+    };
+
+    // ONLY move to preview if we have processed all pages AND we aren't already in a 'paid' or 'fulfillment' state
     const currentStatus = bookRecord?.status;
     const isPaidStatus = ['paid', 'printing', 'shipped', 'printing_test'].includes(currentStatus || '');
-    const finalStatus = (isFulfillment || isPaidStatus) ? (currentStatus === 'illustrated' ? currentStatus : 'preview') : 'teaser';
-    
-    await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { pages: updatedPages, status: finalStatus, updatedAt: new Date() } });
-    
+    const pagesToProcessCount = isFulfillment ? masterPages.length : teaserLimit;
+
+    if (pagesToProcessCount === masterPages.length && !isPaidStatus) {
+      updateData.status = 'preview';
+      // If this was previously a teaser, mark it as claimed
+      if (bookRecord?.userId === null && userEmail !== 'none') {
+        updateData.userId = userEmail;
+      }
+    }
+
+    const updateResult = await db.collection('books').updateOne(
+      { _id: new ObjectId(bookId) },
+      { $set: updateData }
+    );
+    giLog.info(`🎯 [GenerateImages][PID:${pid}] DB Update Result: { matched: ${updateResult.matchedCount}, modified: ${updateResult.modifiedCount} }`);
+
+    // SYNC TO RECENT BOOKS
     if (userEmail !== 'none') {
       await db.collection('users').updateOne(
         { email: userEmail, "recentBooks.id": bookId },
-        { $set: { "recentBooks.$.status": finalStatus, "recentBooks.$.isDigitalUnlocked": true, updatedAt: new Date() } }
+        {
+          $set: {
+            "recentBooks.$.status": updateData.status || currentStatus,
+            "recentBooks.$.isDigitalUnlocked": true,
+            updatedAt: new Date()
+          }
+        }
       ).catch((e) => giLog.error('Failed to sync status to recentBooks:', e));
       giLog.info(`🎯 [GenerateImages][PID:${pid}] Dashboard Sync: Triggered for ${userEmail}`);
     }
 
-    const pagesToProcessCount = isFulfillment ? masterPages.length : teaserLimit;
+    // SMART PDF TRIGGER
     if (pagesToProcessCount === masterPages.length && !isFulfillment) {
       const baseUrl = process.env.APP_URL || 'http://localhost:3000';
       giLog.info(`🚀 Triggering background PDF generation for book: ${bookId}`);
