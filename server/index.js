@@ -102,13 +102,45 @@ app.post('/api/auth/social', async (req, res) => {
 
 app.post('/api/generate-story', async (req, res) => {
   try {
-    const { childName, age, animal, characterStyle, location, lesson, occasion, language, email } = req.body;
-    logger.info(`📖 Generating Story for ${childName}`);
+    const { childName, age, gender, skinTone, hairStyle, hairColor, animal, characterStyle, location, lesson, occasion, language, email } = req.body;
+    
+    logger.info('🎨 ========== STORY GENERATION STYLE OPTIONS ==========');
+    logger.info(`👤 Child/Hero Name: ${childName}`);
+    logger.info(`🚻 Gender: ${gender}`);
+    logger.info(`🌍 Language: ${language || 'English'}`);
+    logger.info(`🐾 Animal: ${animal}`);
+    logger.info(`📚 Lesson: ${lesson || 'None'}`);
+    logger.info(`🎉 Occasion: ${occasion || 'None'}`);
+    logger.info(`📍 Location: ${location || 'None'}`);
+    logger.info(`🎨 Character Style: ${characterStyle}`);
+    logger.info('🎨 ====================================================');
+
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const prompt = `Write a 23-page story for ${childName} and ${animal}. Style: ${characterStyle}. Return JSON { "title", "heroBible", "animalBible", "pages": [{ "pageNumber", "text", "prompt" }] }`;
+    
+    logger.info(`📖 Generating story with 23 pages`);
+    logger.info('🌐 ========== GEMINI STORY PROMPT AUDIT ==========');
+    logger.info(`📜 FULL PROMPT: ${prompt}`);
+    logger.info('🌐 ===============================================');
+
+    logger.info('Starting real Gemini API call for story generation');
     const result = await model.generateContent(prompt);
-    const storyData = JSON.parse((await result.response).text().replace(/```json/g, '').replace(/```/g, ''));
+    logger.info('Gemini API response received');
+    
+    const responseText = (await result.response).text();
+    const storyData = JSON.parse(responseText.replace(/```json/g, '').replace(/```/g, ''));
+    
+    logger.info('✅ ========== STORY GENERATED SUCCESSFULLY ==========');
+    logger.info(`👶 Hero Bible: ${storyData.heroBible}`);
+    logger.info(`🐾 Animal Bible: ${storyData.animalBible}`);
+    
+    storyData.pages?.forEach((page, index) => {
+      logger.info(`📄 Page ${index + 1}: ${page.text.substring(0, 50)}...`);
+      logger.info(`🎨 Prompt ${index + 1}: ${page.prompt.substring(0, 50)}...`);
+    });
+
     const bookResult = await db.collection('books').insertOne({ ...storyData, childName, email, status: 'draft', createdAt: new Date() });
+    logger.info('✅ Story generated and saved to database', { bookId: bookResult.insertedId });
     res.json({ success: true, bookId: bookResult.insertedId, ...storyData });
   } catch (error) { 
     logger.error({ msg: 'Story gen failed', error: error.message });
@@ -118,16 +150,43 @@ app.post('/api/generate-story', async (req, res) => {
 
 app.post('/api/generate-images', async (req, res) => {
   const { bookId } = req.body;
+  const pid = process.pid;
+  logger.info(`🎯 ========== IMAGE GENERATION STARTED [PID:${pid}] ==========`);
+  
   const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+  if (!book) {
+    logger.error(`🎯 Book not found: ${bookId}`);
+    return res.status(404).json({ error: 'Book not found' });
+  }
+
+  logger.info(`🎯 DB Record Status: { status: "${book.status}", pages: ${book.pages?.length} }`);
   res.json({ success: true, message: 'Painting started' });
 
   (async () => {
-    for (let i = 0; i < book.pages.length; i++) {
-      const url = await generateImageRace(`Style: ${book.characterStyle}. ${book.pages[i].prompt}`, bookId, i + 1);
-      if (url) await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { [`pages.${i}.imageUrl`]: url } });
+    try {
+      for (let i = 0; i < book.pages.length; i++) {
+        const page = book.pages[i];
+        logger.info(`🎨 [Page ${i + 1}] Starting painting cycle...`);
+        
+        const url = await generateImageRace(`Style: ${book.characterStyle}. ${page.prompt}`, bookId, i + 1);
+        
+        if (url) {
+          await db.collection('books').updateOne(
+            { _id: new ObjectId(bookId) }, 
+            { $set: { [`pages.${i}.imageUrl`]: url } }
+          );
+          logger.info(`✅ [Page ${i + 1}] Success! Image saved.`);
+        } else {
+          logger.warn(`⚠️ [Page ${i + 1}] Painting failed or returned no URL.`);
+        }
+      }
+      
+      await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { status: 'illustrated' } });
+      logger.info(`🎯 [GenerateImages][PID:${pid}] Execution complete.`);
+      logger.info(`✨ Book ${bookId} fully illustrated.`);
+    } catch (err) {
+      logger.error(`💥 [GenerateImages][PID:${pid}] Fatal error:`, err.message);
     }
-    await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { status: 'illustrated' } });
-    logger.info(`✨ Book ${bookId} fully illustrated.`);
   })();
 });
 
