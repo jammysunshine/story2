@@ -149,6 +149,9 @@ async function generatePdf(db, bookId) {
       timeout: 120000
     });
 
+    // WAIT FOR REACT TO RENDER DATA
+    await page.waitForSelector('.page', { timeout: 60000 });
+
     logger.info('⏳ Waiting for all images to load in browser...');
     const imageStatus = await page.evaluate(async () => {
       const images = Array.from(document.querySelectorAll('img'));
