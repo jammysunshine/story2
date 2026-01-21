@@ -4,15 +4,16 @@ const { ObjectId } = require("mongodb");
 const axios = require("axios");
 const logger = require("./logger");
 
-const STORY_REF_CONCURRENCY = parseInt(process.env.STORY_REF_CONCURRENCY || "3");
+const STORY_REF_CONCURRENCY = parseInt(process.env.STORY_REF_CONCURRENCY || "5");
 const STORY_REF_RETRIES = parseInt(process.env.STORY_REF_RETRIES || "5");
 const STORY_REF_TIMEOUT_MS = parseInt(process.env.STORY_REF_TIMEOUT_MS || "120000");
-const STORY_BATCH_DELAY_MS = parseInt(process.env.STORY_BATCH_DELAY_MS || "90000");
+const STORY_BATCH_DELAY_MS = parseInt(process.env.STORY_BATCH_DELAY_MS || "65000");
+const TEASER_IMAGES_CONCURRENCY = parseInt(process.env.TEASER_IMAGES_CONCURRENCY || "3");
+const IMAGE_COST = 2;
+const STORY_COST = 10;
+const PDF_COST_CREDITS = 15;
 const TEASER_LIMIT = 7;
 
-/**
- * Helper to convert storage URLs to gs:// URIs for Gemini
- */
 const getGcsUriFromUrl = (urlStr) => {
   try {
     if (!urlStr) return null;
@@ -27,7 +28,7 @@ const getGcsUriFromUrl = (urlStr) => {
 };
 
 async function callGeminiImageGen(params) {
-  const { prompt, referenceImages, pageNumber, bucket, timeoutMs = 120000 } = params;
+  const { prompt, negativePrompt, referenceImages, pageNumber, bucket, timeoutMs = 120000 } = params;
   const apiKey = process.env.GOOGLE_API_KEY;
 
   let geminiAttempt = 0;
@@ -41,7 +42,7 @@ async function callGeminiImageGen(params) {
     }, 15000);
 
     try {
-      logger.info(`🤖 [Page ${pageNumber}] Attempting Gemini Pro... (Attempt ${geminiAttempt + 1})`);
+      logger.info(`⏳ [Page ${pageNumber}] Waiting for Gemini Pro to paint... (Attempt ${geminiAttempt + 1})`);
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-3-pro-image-preview" });
 
@@ -72,7 +73,7 @@ async function callGeminiImageGen(params) {
             });
             hasImages = true;
           } catch (e) {
-            logger.warn(`⚠️ [Page ${pageNumber}] Ref load fail: ${e.message}`);
+            logger.warn(`⚠️ [Page ${pageNumber}] Reference Load Fail: ${e.message}`);
           }
         }
       }
@@ -101,57 +102,70 @@ async function callGeminiImageGen(params) {
   const response = geminiResult;
   if (response && response.candidates?.[0]?.finishReason === 'SAFETY') {
     logger.error(`🛡️ SAFETY ALERT: Page ${pageNumber} Gemini prompt was blocked.`);
-    return null;
+    return { error: 'SAFETY_FILTER_BLOCK' };
   }
 
   const imagePart = response?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
-  return imagePart?.inlineData?.data || null;
+  if (imagePart?.inlineData?.data) {
+      logger.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`);
+      return { bytesBase64Encoded: imagePart.inlineData.data };
+  }
+  return null;
 }
 
 async function generateImages(db, bookId, isFulfillment = false) {
   const pid = process.pid;
   logger.info(`🎯 ========== FUNCTION STARTED [PID:${pid}] ==========`);
-  logger.info(`🎯 Params: { pagesCount: unknown, isFulfillment: ${isFulfillment} }`);
 
   const book = await db.collection("books").findOne({ _id: new ObjectId(bookId) });
   if (!book) throw new Error("Book not found");
 
+  const userEmail = book.email?.toLowerCase();
+  logger.info(`🎯 Params: { pagesCount: ${book.pages?.length}, isFulfillment: ${isFulfillment} }`);
+
   const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
   const bucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
 
-  // 1. RESOLVE CHARACTER REFERENCES
-  logger.info(`📸 [GenerateImages][PID:${pid}] STEP 1: RESOLVING REFERENCE IMAGES`);
+  // 1. CHARACTER IDENTITY RACES
+  logger.info(`📸 [GenerateImages][PID:${pid}] STEP 1: RESOLVING REFERENCE IMAGES (PARALLEL MEGA-RACE)`);
   
   async function generateReferenceImageRace(bible, type) {
     const fileName = `books/${bookId}/${type}_reference.png`;
     const file = bucket.file(fileName);
     const existing = await file.exists();
-    if (existing[0]) return `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`;
+    if (existing[0]) {
+        const [signedUrl] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
+        logger.info(`📸 ${type} reference image already exists (signed): ${signedUrl.substring(0, 50)}...`);
+        return signedUrl;
+    }
 
     const prompt = `${bible}. Professional storybook illustration, ${book.characterStyle}. Centered character portrait, neutral expression, front view.`;
     
     let raceAttempt = 0;
     while (raceAttempt < STORY_REF_RETRIES) {
       const concurrency = Math.min(raceAttempt + 1, STORY_REF_CONCURRENCY);
+      logger.info(`🚀 [${type.toUpperCase()}_RACE] Starting Batch ${raceAttempt + 1}/${STORY_REF_RETRIES} (${concurrency} runners)...`);
       try {
         const runners = Array.from({ length: concurrency }).map(async (_, idx) => {
           return await callGeminiImageGen({
             prompt, bucket, pageNumber: `${type}_race${raceAttempt}_r${idx}`, timeoutMs: STORY_REF_TIMEOUT_MS
           });
         });
-        const winnerBase64 = await Promise.any(runners.map(p => p.then(res => { if (!res) throw new Error("No data"); return res; })));
-        if (winnerBase64) {
-          await file.save(Buffer.from(winnerBase64, "base64"), { metadata: { contentType: "image/png" } });
-          const url = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`;
-          await db.collection('images').updateOne({ bookId: new ObjectId(bookId), type: `${type}_reference` }, { $set: { gcsUrl: url, updatedAt: new Date(), model: 'gemini' } }, { upsert: true });
-          return url;
+        const winner = await Promise.any(runners.map(p => p.then(res => { if (!res || !res.bytesBase64Encoded) throw new Error("No data"); return res; })));
+        if (winner.bytesBase64Encoded) {
+          await file.save(Buffer.from(winner.bytesBase64Encoded, "base64"), { metadata: { contentType: "image/png" } });
+          const [signedUrl] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
+          await db.collection('images').updateOne({ bookId: new ObjectId(bookId), type: `${type}_reference` }, { $set: { gcsUrl: `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`, updatedAt: new Date(), model: 'gemini' } }, { upsert: true });
+          logger.info(`✅ [${type.toUpperCase()}_RACE] Winner found in Batch ${raceAttempt + 1}!`);
+          return signedUrl;
         }
       } catch (e) {
         raceAttempt++;
-        await new Promise(r => setTimeout(r, 10000));
+        logger.warn(`⏳ [${type.toUpperCase()}_RACE] Waiting before next batch...`);
+        await new Promise(r => setTimeout(r, 15000));
       }
     }
-    throw new Error(`Failed to generate ${type} reference`);
+    throw new Error(`Failed all ${STORY_REF_RETRIES} batches`);
   }
 
   const [heroRefUrl, animalRefUrl] = await Promise.all([
@@ -160,9 +174,9 @@ async function generateImages(db, bookId, isFulfillment = false) {
   ]);
 
   // 2. MASTER ARRAY
-  logger.info(`🏗️ [GenerateImages][PID:${pid}] STEP 2: CONSTRUCTING MASTER ARRAY`);
+  logger.info(`🏗️ [GenerateImages][PID:${pid}] STEP 2: CONSTRUCTING MASTER ARRAY (27 Pages)`);
   const masterPages = [];
-  masterPages.push({ pageNumber: 1, type: 'photo', text: book.photoUrl ? `Look, here is the real you!` : `Look, here is you as a storybook hero!`, imageUrl: book.photoUrl || heroRefUrl, prompt: `Portrait` });
+  masterPages.push({ pageNumber: 1, type: 'photo', text: book.photoUrl ? `Look, here is the real you!` : `Look, here is you as a storybook hero!`, url: book.photoUrl || heroRefUrl, imageUrl: book.photoUrl || heroRefUrl, prompt: `Portrait` });
   
   const introPrompt = `Our hero child ${book.childName} is standing in the ${book.location || 'beautiful landscape'}, looking at the horizon with a bright smile, ready for a big adventure. Bathed in the ${book.characterStyle} aesthetic.`;
   masterPages.push({ pageNumber: 2, type: 'story', text: `Once upon a time, your adventure began right here!`, prompt: introPrompt });
@@ -172,62 +186,78 @@ async function generateImages(db, bookId, isFulfillment = false) {
   book.pages.forEach((p, idx) => { masterPages.push({ ...p, type: 'story', pageNumber: idx + 4 }); });
   masterPages.push({ pageNumber: masterPages.length + 1, type: 'story', text: "The End. May your adventures never truly end!", prompt: book.finalPrompt || `Final interaction scene.` });
 
+  logger.info(`📊 Master array constructed: ${masterPages.length} pages total`);
+  logger.info(`💾 Initializing DB with master array structure...`);
   await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { pages: masterPages, updatedAt: new Date() } });
 
   const referenceImages = [];
-  if (heroRefUrl) referenceImages.push({ uri: getGcsUriFromUrl(book.photoUrl || heroRefUrl) });
-  if (animalRefUrl) referenceImages.push({ uri: getGcsUriFromUrl(animalRefUrl) });
+  const heroUri = getGcsUriFromUrl(book.photoUrl || heroRefUrl);
+  const animalUri = getGcsUriFromUrl(animalRefUrl);
+  if (heroUri) referenceImages.push({ uri: heroUri });
+  if (animalUri) referenceImages.push({ uri: animalUri });
 
-  // 3. PAINTING ENGINE
+  // 3. PAINTING ENGINE (THE HYBRID LOOP)
   const paintPageWithRetry = async (idx) => {
     const page = masterPages[idx];
-    if (page.imageUrl && !page.imageUrl.includes('placeholder')) return true;
+    const isActuallyPainted = page.imageUrl && (page.imageUrl.includes('X-Goog-Signature') || page.imageUrl.includes('/books/') || page.imageUrl.includes('/uploads/')) && !page.imageUrl.includes('placeholder');
+
+    if (isActuallyPainted) {
+        logger.info(`⏭️ [Page ${page.pageNumber}] Skipping (already painted)`);
+        await db.collection('images').updateOne({ bookId: new ObjectId(bookId), pageNumber: page.pageNumber }, { $set: { gcsUrl: page.imageUrl, updatedAt: new Date(), model: 'previously_painted' } }, { upsert: true });
+        return true;
+    }
 
     let cycle = 0;
     const MAX_CYCLES = 5;
     while (cycle < MAX_CYCLES) {
-      const concurrency = idx < TEASER_LIMIT ? Math.min(cycle + 1, 3) : 1;
+      const isTeaserPage = idx < TEASER_LIMIT;
+      const concurrency = isTeaserPage ? Math.min(cycle + 1, TEASER_IMAGES_CONCURRENCY) : 1;
       logger.info(`🎨 [Page ${page.pageNumber}] Painting Cycle ${cycle + 1}/${MAX_CYCLES} (${concurrency} runners)...`);
       
       try {
-        let charInstr = `Ref 1 is child, Ref 2 is animal. Visual consistency.`;
-        if (page.pageNumber === 2) charInstr = `Ref 1 is child. Only child in scene.`;
-        const prompt = `Style: ${book.characterStyle}. ${book.heroBible} ${book.animalBible}. ${charInstr} Scene: ${page.prompt}`;
+        let charInstr = `Ref 1 is the child hero. Ref 2 is their animal friend. Refer to these for visual consistency. Depict both interacting naturally.`;
+        if (page.pageNumber === 2) charInstr = `Refer to Ref 1 for the child's appearance. Only the child hero should be in this scene.`;
+
+        const prompt = `Wholesome children's book illustration. Style: ${book.characterStyle}. ${book.heroBible} ${book.animalBible}. ${charInstr} Scene: ${page.prompt}`;
 
         const runners = Array.from({ length: concurrency }).map(async (_, rIdx) => {
-          return await callGeminiImageGen({ prompt, referenceImages, pageNumber: `p${page.pageNumber}_c${cycle}_r${rIdx}`, bucket });
+          return await callGeminiImageGen({
+            prompt, negativePrompt: "distorted features, scary, dark themes, blurry, low resolution, missing limbs, extra fingers",
+            referenceImages, bucket, pageNumber: `p${page.pageNumber}_c${cycle}_r${rIdx}`
+          });
         });
 
-        const winnerBase64 = await Promise.any(runners.map(p => p.then(res => { if (!res) throw new Error("No data"); return res; })));
-        if (winnerBase64) {
+        const winner = await Promise.any(runners.map(p => p.then(res => { if (!res || !res.bytesBase64Encoded) throw new Error("No data"); return res; })));
+        if (winner.bytesBase64Encoded) {
           const fileName = `books/${bookId}/page_${page.pageNumber}.png`;
-          await bucket.file(fileName).save(Buffer.from(winnerBase64, "base64"), { metadata: { contentType: "image/png" } });
-          const signedUrl = (await bucket.file(fileName).getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 }))[0];
+          await bucket.file(fileName).save(Buffer.from(winner.bytesBase64Encoded, "base64"), { metadata: { contentType: "image/png" } });
+          const [signedUrl] = await bucket.file(fileName).getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
           
+          const timestamp = Date.now();
+          const imageUrlWithBuster = `${signedUrl}?v=${timestamp}`;
+
           await Promise.all([
-            db.collection("books").updateOne({ _id: new ObjectId(bookId) }, { $set: { [`pages.${idx}.imageUrl`]: signedUrl, updatedAt: new Date() } }),
+            db.collection("books").updateOne({ _id: new ObjectId(bookId) }, { $set: { [`pages.${idx}.imageUrl`]: imageUrlWithBuster, pdfUrl: '', updatedAt: new Date() } }),
             db.collection('images').updateOne({ bookId: new ObjectId(bookId), pageNumber: page.pageNumber }, { $set: { gcsUrl: signedUrl.split('?')[0], updatedAt: new Date(), model: 'gemini' } }, { upsert: true })
           ]);
-          logger.info(`✅ [Page ${page.pageNumber}] Success! [PID:${pid}]`);
+          logger.info(`✅ [Page ${page.pageNumber}] Success! (Atomic sync complete)`);
           return true;
         }
       } catch (e) {
-        logger.warn(`⚠️ [Page ${page.pageNumber}] Cycle ${cycle + 1} failed: ${e.message}`);
         cycle++;
+        logger.warn(`⏳ [Page ${page.pageNumber}] Waiting ${ (10000 * cycle)/1000 }s before next cycle...`);
         await new Promise(r => setTimeout(r, 10000 * cycle));
       }
     }
     return false;
   };
 
-  // TEASER
   logger.info(`🚀 [GenerateImages][PID:${pid}] FIRING TEASER BATCH`);
   const teaserIndices = masterPages.map((_, i) => i).filter(i => i < TEASER_LIMIT);
   await Promise.all(teaserIndices.map(idx => paintPageWithRetry(idx)));
 
-  // REGULAR
   if (isFulfillment) {
-    logger.info(`🚀 [GenerateImages][PID:${pid}] FIRING REGULAR BATCHES`);
+    logger.info(`🚀 [GenerateImages][PID:${pid}] FIRING REGULAR BATCHES with fire-and-forget delay...`);
     const regularIndices = masterPages.map((_, i) => i).filter(i => i >= TEASER_LIMIT);
     const BATCH_SIZE = 18;
     for (let i = 0; i < regularIndices.length; i += BATCH_SIZE) {
@@ -237,13 +267,30 @@ async function generateImages(db, bookId, isFulfillment = false) {
     }
   }
 
-  // FINALIZATION
+  // FINAL SYNC AND CREDITS
+  logger.info(`💾 ========== FINALIZING BOOK DOCUMENT ==========`);
   const finalStatus = isFulfillment ? 'preview' : 'teaser';
+  const pagesToProcess = isFulfillment ? masterPages.length : TEASER_LIMIT;
+
   await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { status: finalStatus, updatedAt: new Date() } });
   
-  if (book.email) {
-    await db.collection('users').updateOne({ email: book.email.toLowerCase(), "recentBooks.id": bookId }, { $set: { "recentBooks.$.status": finalStatus, updatedAt: new Date() } });
-    logger.info(`🎯 [GenerateImages][PID:${pid}] Dashboard Sync complete for ${book.email}`);
+  if (userEmail) {
+    const isAdmin = ['jammy.sunshine@gmail.com', 'jammy.sunshine@googlemail.com'].includes(userEmail);
+    const totalToDeduct = isFulfillment ? 0 : (PDF_COST_CREDITS + (book.status === 'teaser' ? STORY_COST : 0));
+
+    await db.collection('users').updateOne(
+        { email: userEmail },
+        { 
+            $inc: { credits: isAdmin ? 0 : -totalToDeduct, imagesCount: pagesToProcess, storiesCount: book.status === 'teaser' ? 1 : 0 },
+            $set: { updatedAt: new Date() }
+        }
+    );
+
+    await db.collection('users').updateOne(
+        { email: userEmail, "recentBooks.id": bookId },
+        { $set: { "recentBooks.$.status": finalStatus, "recentBooks.$.isDigitalUnlocked": true, updatedAt: new Date() } }
+    );
+    logger.info(`💰 Atomic Sync: Deducted ${totalToDeduct} for ${userEmail}`);
   }
 
   if (isFulfillment) {
