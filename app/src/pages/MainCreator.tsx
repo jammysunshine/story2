@@ -24,6 +24,13 @@ const options = {
   locations: ['Magical Forest', 'Deep Ocean', 'Outer Space', 'Castle', 'Dinosaur Jungle']
 }
 
+const randomNames = ['Emma', 'Liam', 'Olivia', 'Noah', 'Ava', 'William', 'Sophia', 'James', 'Isabella', 'Benjamin', 'Mia', 'Lucas', 'Charlotte', 'Henry', 'Amelia', 'Theo', 'Luna', 'Leo', 'Zoe', 'Jack'];
+const randomAnimals = ['Lion', 'Tiger', 'Elephant', 'Panda', 'Rabbit', 'Fox', 'Wolf', 'Bear', 'Owl', 'Dragon', 'Unicorn', 'Penguin', 'Giraffe', 'Monkey', 'Koala', 'Dolphin', 'Cat', 'Dog', 'Squirrel', 'Hedgehog', 'Turtle', 'Frog', 'Horse', 'Deer', 'Raccoon', 'Otter', 'Peacock', 'Parrot', 'Eagle', 'Hawk', 'Kangaroo', 'Cheetah', 'Leopard', 'Zebra', 'Gorilla', 'Chimpanzee', 'Crocodile', 'Alligator', 'Snake', 'Lizard', 'Butterfly', 'Bee', 'Crab', 'Octopus', 'Whale', 'Seal', 'Polar Bear', 'Camel', 'Rhino', 'Hippopotamus', 'Flamingo'];
+const randomLessons = ['Kindness', 'Courage', 'Friendship', 'Honesty', 'Respect', 'Responsibility', 'Patience', 'Generosity', 'Perseverance', 'Empathy', 'Sharing', 'Gratitude', 'Self-belief', 'Curiosity', 'Listening'];
+const randomOccasions = ['Everyday Adventure', 'Birthday Party', 'Christmas Eve', 'Thanksgiving Dinner', 'New Year\'s Celebration', 'First Day of School', 'Final Exams', 'Play Date', 'Summer Vacation', 'Bedtime Story', 'Rainy Day Fun', 'Grandparents\' Visit', 'Halloween Night', 'Easter Egg Hunt', 'Losing a First Tooth'];
+
+const getRandomItem = (array: string[]) => array[Math.floor(Math.random() * array.length)];
+
 export default function MainCreator() {
   const { toast } = useToast()
   const [step, setStep] = useState(1)
@@ -46,8 +53,29 @@ export default function MainCreator() {
     animal: 'Lion',
     characterStyle: 'Disney-inspired 3D render',
     location: 'Magical Forest',
-    lesson: 'Kindness'
+    lesson: 'Kindness',
+    occasion: 'Everyday Adventure'
   })
+
+  const randomizeFormData = () => {
+    setFormData({
+      childName: getRandomItem(randomNames),
+      age: (Math.floor(Math.random() * 8) + 3).toString(),
+      gender: getRandomItem(options.genders),
+      skinTone: getRandomItem(options.skinTones),
+      hairStyle: getRandomItem(options.hairStyles),
+      hairColor: getRandomItem(options.hairColors),
+      animal: getRandomItem(randomAnimals),
+      characterStyle: getRandomItem(options.styles),
+      location: getRandomItem(options.locations),
+      lesson: getRandomItem(randomLessons),
+      occasion: getRandomItem(randomOccasions)
+    });
+    toast({
+      title: "✨ Magic Applied!",
+      description: "We've picked some fun traits for you.",
+    });
+  };
 
   useEffect(() => {
     let interval: any;
@@ -199,9 +227,16 @@ export default function MainCreator() {
 
       {step === 1 && (
         <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="text-center">
+          <div className="flex flex-col items-center gap-4 text-center">
             <h2 className="text-4xl font-black uppercase tracking-tighter text-white">The Hero</h2>
-            <p className="text-slate-400">Personalize your child's character.</p>
+            <Button
+              variant="outline"
+              onClick={randomizeFormData}
+              className="rounded-full border-primary/30 text-primary hover:bg-primary/10 h-10 px-6 text-xs font-black uppercase tracking-widest"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Surprise Me
+            </Button>
           </div>
 
           <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl space-y-6">
