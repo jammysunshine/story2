@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Package, ArrowRight, Loader2, Receipt, FileDown, Sparkles, Star } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:3001/api';

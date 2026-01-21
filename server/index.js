@@ -32,7 +32,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 let db;
 
 async function connectDB() {
-  const client = new MongoClient(process.env.MONGODB_URI);
+  const client = new MongoClient(process.env.MONGODB_URI, { family: 4 });
   await client.connect();
   db = client.db('story-db-v2');
   logger.info('✅ Connected to MongoDB');

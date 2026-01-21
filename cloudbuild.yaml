@@ -1,0 +1,75 @@
+steps:
+  # 1. Pull Next.js cache from GCS to speed up build
+  - name: 'gcr.io/cloud-builders/gsutil'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gsutil cp gs://${PROJECT_ID}-build-cache/next-cache.tar.gz next-cache.tar.gz && tar -xzf next-cache.tar.gz || echo "No cache found"
+
+  # 2. Build the Docker image using BuildKit and inline cache
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker buildx create --use --driver docker-container
+        docker buildx build \
+          --cache-from=type=registry,ref=$_AR_HOSTNAME/$PROJECT_ID/ai-storytime-app/$_SERVICE_NAME:buildcache \
+          --cache-to=type=registry,ref=$_AR_HOSTNAME/$PROJECT_ID/ai-storytime-app/$_SERVICE_NAME:buildcache,mode=max \
+          -t $_AR_HOSTNAME/$PROJECT_ID/ai-storytime-app/$_SERVICE_NAME:latest \
+          --build-arg NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY \
+          --push \
+          .
+
+  # 3. Extract and upload NEW Next.js cache to GCS
+  # We do this after build to ensure next time is faster
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker create --name extract-cache $_AR_HOSTNAME/$PROJECT_ID/ai-storytime-app/$_SERVICE_NAME:latest
+        docker cp extract-cache:/app/.next/cache ./next-cache || echo "Cache extraction failed"
+        tar -czf next-cache.tar.gz ./next-cache
+        gsutil cp next-cache.tar.gz gs://${PROJECT_ID}-build-cache/next-cache.tar.gz || echo "Cache upload failed"
+        docker rm extract-cache
+
+  # 4. Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image'
+      - '$_AR_HOSTNAME/$PROJECT_ID/ai-storytime-app/$_SERVICE_NAME:latest'
+      - '--region'
+      - '$_DEPLOY_REGION'
+      - '--platform'
+      - 'managed'
+      - '--port'
+      - '3000'
+      - '--memory'
+      - '4Gi'
+      - '--cpu'
+      - '2'
+      - '--timeout'
+      - '600'
+      - '--concurrency'
+      - '1'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'GCP_PROJECT_ID=$PROJECT_ID,GCS_IMAGES_BUCKET_NAME=storytime-images-1768-sydney,GCS_PDFS_BUCKET_NAME=storytime-pdfs-1768-sydney,IMAGE_GENERATION_SERVICE=GOOGLE_IMAGEN,STORY_PAGES_COUNT=23,BASE_CURRENCY=aud,CREDITS_PER_BASE_CURRENCY=1,IMAGE_GENERATION_DELAY_MS=15000,STORY_REF_CONCURRENCY=2,STORY_IMAGE_CONCURRENCY=25,ALLOW_DEV_LOGIN=false,PRINT_MIN_PAGES=10,PRINT_PAGE_COST=4,PRINT_SHIPPING_COST=10'
+      - '--set-secrets'
+      - 'MONGODB_URI=MONGODB_URI:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,NEXTAUTH_SECRET=NEXTAUTH_SECRET:latest,AUTH_SECRET=AUTH_SECRET:latest,SMTP_PASSWORD=SMTP_PASSWORD:latest,MISTRAL_API_KEY=MISTRAL_API_KEY:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,APP_URL=APP_URL:latest,NEXTAUTH_URL=NEXTAUTH_URL:latest,SMTP_USER=SMTP_USER:latest,GELATO_API_KEY=GELATO_API_KEY:latest,GELATO_TEST_MODE=GELATO_TEST_MODE:latest,GOOGLE_API_KEY=GOOGLE_API_KEY:latest'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _DEPLOY_REGION: australia-southeast1
+  _AR_HOSTNAME: australia-southeast1-docker.pkg.dev
+  _SERVICE_NAME: ai-storytime
+  _NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: "missing"

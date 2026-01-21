@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build outputs
+.next
+out
+build
+dist
+.vercel
+
+# Local assets & documentation (Not needed in production container)
+storytime-mockups
+docs
+scripts
+*.png
+*.jpg
+*.html
+response.json
+
+# Debugging and Logs
+*.log
+*.pdf
+docker_build.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Secrets and Git
+.git
+.gitignore
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# OS files
+**/.DS_Store
+Thumbs.db
+
+.qwen/

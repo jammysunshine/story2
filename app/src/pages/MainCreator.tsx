@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Image as ImageIcon, LogIn, User, LogOut, Camera, Lock, RefreshCcw, MapPin, Palette, Package, ExternalLink } from 'lucide-react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink } from 'lucide-react'
 import axios from 'axios'
 import { 
   Sheet,
@@ -25,8 +25,8 @@ export default function MainCreator() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [book, setBook] = useState<any>(null)
-  const [user, setUser] = useState<any>(null)
-  const [photoUrl, setPhotoUrl] = useState('')
+  const [user] = useState<any>(null)
+  const [photoUrl] = useState('')
   const [orders, setOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   
