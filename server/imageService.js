@@ -199,18 +199,41 @@ async function generateImages(db, bookId, isFulfillment = false) {
   });
 
   const projectId = process.env.GCP_PROJECT_ID;
-  giLog.info(`🔧 [IMAGE_GEN_DEBUG] Project ID from env: "${projectId}"`);
-  giLog.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path: "${process.env.GOOGLE_APPLICATION_CREDENTIALS}"`);
+  const rawKeyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const path = require('path');
+  const keyPath = path.isAbsolute(rawKeyPath) ? rawKeyPath : path.resolve(process.cwd(), '..', rawKeyPath);
 
-  const storage = new Storage({ projectId: projectId || undefined });
+  giLog.info(`🔧 [IMAGE_GEN_DEBUG] Project ID from env: "${projectId}"`);
+  giLog.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path (Resolved): "${keyPath}"`);
+
+  if (!projectId) {
+    giLog.error('❌ [IMAGE_GEN_DEBUG] GCP_PROJECT_ID is MISSING or EMPTY.');
+  }
+
+  let storage, authClient;
+  try {
+    storage = new Storage({ projectId: projectId || undefined, keyFilename: keyPath });
+    authClient = new GoogleAuth({
+      projectId: projectId || undefined,
+      keyFilename: keyPath,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+  } catch (authErr) {
+    giLog.error(`❌ [IMAGE_GEN_DEBUG] Failed to initialize GCS/Auth Clients: ${authErr.message}`);
+    throw authErr;
+  }
+
   const bucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
 
-  const authClient = new GoogleAuth({
-    projectId: projectId || undefined,
-    scopes: ['https://www.googleapis.com/auth/cloud-platform']
-  });
-  const gClient = await authClient.getClient();
-  const accessToken = await gClient.getAccessToken();
+  let accessToken;
+  try {
+    const gClient = await authClient.getClient();
+    accessToken = await gClient.getAccessToken();
+    if (!accessToken.token) throw new Error('Token is empty');
+  } catch (tokenErr) {
+    giLog.error(`❌ [IMAGE_GEN_DEBUG] Failed to obtain access token: ${tokenErr.message}`);
+    throw tokenErr;
+  }
 
   giLog.info('📸 STEP 1: RESOLVING REFERENCE IMAGES (PARALLEL MEGA-RACE)');
   

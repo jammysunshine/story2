@@ -8,6 +8,8 @@ const Stripe = require('stripe');
 const axios = require('axios');
 const { Storage } = require('@google-cloud/storage');
 const { OAuth2Client } = require('google-auth-library');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
 const { sendStoryEmail } = require('./mail');
 const { generateImages } = require('./imageService');
 const { generatePdf, get7DaySignedUrl } = require('./pdfService');
@@ -16,6 +18,7 @@ const logger = require('./logger');
 dotenv.config();
 
 const app = express();
+const upload = multer({ storage: multer.memoryStorage() });
 app.use((req, res, next) => {
   if (req.originalUrl === '/api/webhook') next();
   else express.json({ limit: '10mb' })(req, res, next);
@@ -98,52 +101,232 @@ app.post('/api/auth/social', async (req, res) => {
     res.json({ success: true, user: user.value || user });
   } catch (err) { 
     logger.error('Auth failure');
-    res.status(401).json({ error: 'Auth failed' }); 
+    res.status(500).json({ error: 'Auth failed' });
   }
 });
 
+app.post('/api/upload', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    const fileExtension = file.originalname.split('.').pop() || 'png';
+    const fileName = `uploads/${uuidv4()}.${fileExtension}`;
+    const blob = bucket.file(fileName);
+
+    await blob.save(file.buffer, {
+      metadata: { contentType: file.mimetype },
+      public: true
+    });
+
+    const publicUrl = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`;
+    res.json({ url: publicUrl });
+  } catch (error) {
+    logger.error('Upload error:', error.message);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+function getSafeAgeDescription(age) {
+  const ageNum = parseInt(age);
+  if (ageNum <= 2) return "a tiny toddler";
+  if (ageNum <= 5) return "a playful little child";
+  if (ageNum <= 9) return "a brave young hero";
+  if (ageNum <= 13) return "a curious young adventurer";
+  return "a youthful hero";
+}
+
 app.post('/api/generate-story', async (req, res) => {
   try {
-    const { childName, age, gender, skinTone, hairStyle, hairColor, animal, characterStyle, location, lesson, occasion, language, email } = req.body;
+    const { childName, age, gender = 'Boy', skinTone, hairStyle, hairColor, animal, characterStyle, occasion, language, theme = 'custom', email, photoUrl } = req.body;
     
+    const ageDescription = getSafeAgeDescription(age || '5');
+    const lesson = req.body.lesson?.toLowerCase() === 'none' ? '' : req.body.lesson;
+    const location = req.body.location?.toLowerCase() === 'none' ? '' : req.body.location;
+
+    let persona = "specialist children's book author";
+    let targetAudience = `a child named ${childName}`;
+    let extraInstructions = "The story should be appropriate for children.";
+    
+    if (theme === 'valentine') {
+      persona = "poetic and sophisticated romantic author";
+      targetAudience = `a beloved person named ${childName}`;
+      extraInstructions = "The story should be elegant, romantic, and deeply meaningful. Avoid childish language. Focus on shared memories, the beauty of the relationship, and a future together. It should feel like a high-end personalized gift book.";
+    } else if (theme === 'superhero') {
+      persona = "dynamic comic book and adventure writer";
+      extraInstructions = "The story should be action-packed and inspiring, focusing on the character's unique powers and courage.";
+    }
+
     logger.info('🎨 ========== STORY GENERATION STYLE OPTIONS ==========');
     logger.info(`👤 Child/Hero Name: ${childName}`);
+    logger.info(`🎭 Theme Mode: ${theme}`);
+    logger.info(`✍️ Persona: ${persona}`);
     logger.info(`🚻 Gender: ${gender}`);
     logger.info(`🌍 Language: ${language || 'English'}`);
     logger.info(`🐾 Animal: ${animal}`);
-    logger.info(`📚 Lesson: ${lesson || 'None'}`);
+    logger.info(`📚 Lesson: ${lesson || 'None (Focus on pure fun/adventure)'}`);
     logger.info(`🎉 Occasion: ${occasion || 'None'}`);
-    logger.info(`📍 Location: ${location || 'None'}`);
+    logger.info(`📍 Location: ${location || 'None (AI determined)'}`);
     logger.info(`🎨 Character Style: ${characterStyle}`);
+    logger.info(`🛡️ Anti-Creepy Rule: friendly expression, large expressive eyes, no distorted features`);
     logger.info('🎨 ====================================================');
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `Write a 23-page story for ${childName} and ${animal}. Style: ${characterStyle}. Return JSON { "title", "heroBible", "animalBible", "pages": [{ "pageNumber", "text", "prompt" }] }`;
-    
-    logger.info(`📖 Generating story with 23 pages`);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: {
+        maxOutputTokens: 8192,
+        temperature: 0.8,
+        topP: 0.95,
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const pagesCount = parseInt(process.env.STORY_PAGES_COUNT || '23');
+    const prompt = `IMPORTANT SAFETY INSTRUCTIONS: You must create content that is 100% compliant with strict AI image generation safety filters.
+   - Focus on wholesome, joyful, and professional storybook quality.
+   You are a ${persona}. Your task is to create a story featuring two main characters: a child and an animal companion.
+   FIRST: Create a 'Hero Bible' for the child and an 'Animal Bible' for the animal.
+   - Write each Bible as a short, natural paragraph of descriptive prose (under 60 words).
+   - Focus on simple, positive, and visual traits.
+   HERO BIBLE (The Child):
+   - Name: "${childName}"
+   - Gender: ${gender} (CRITICAL: You MUST portray the child as a ${gender.toLowerCase()} and use ${gender.toLowerCase() === 'boy' ? 'he/him' : 'she/her'} pronouns exclusively throughout the entire story and Hero Bible).
+   - Description: ${gender} child, ${skinTone} skin tone, ${hairStyle} ${hairColor} hair.
+   - Appearance: Friendly expression, bright expressive eyes, wearing simple colorful children's clothing.
+   ANIMAL BIBLE (The Animal):
+   - Species: "${animal}"
+   - Appearance: A friendly and cute ${animal.toLowerCase()} with gentle eyes and typical features for its species.
+   - Artistic style for both: "${characterStyle}"
+   IMPORTANT: You must create EXACTLY ${pagesCount} pages. Not more, not less.
+   For the ${pagesCount}-page story:
+   Every single visual_prompt you generate MUST start with the Hero Bible paragraph AND the Animal Bible paragraph before describing the scene. This is mandatory for visual consistency.
+   CRITICAL: You must write the entire story and the catchy title in ${language || 'English'}.
+   Create a EXACTLY ${pagesCount} page story where ${childName} and their ${animal.toLowerCase()} friend go on an adventure. ${location ? `The story takes place in ${location}.` : ""} ${occasion ? `The story revolves around the theme or occasion of "${occasion}".` : ""} ${lesson ? `The lesson should teach: "${lesson}".` : ""} ${extraInstructions}
+   CRITICAL REQUIREMENTS:
+   - You MUST create EXACTLY ${pagesCount} pages (no more, no less)
+   - Each page MUST have pageNumber, text, and prompt fields
+   - Every prompt MUST start with the EXACT Hero Bible and Animal Bible text.
+   - The story should have a clear beginning, middle, and end
+   Return the result as a JSON object with the following structure:
+   {
+   "title": "A catchy title",
+   "heroBible": "Descriptive paragraph for the child",
+   "animalBible": "Descriptive paragraph for the animal",
+   "finalPrompt": "A visual prompt for the 'The End' page that captures the theme of the story",
+   "pages": [
+   {
+   "pageNumber": 1,
+   "text": "Story text",
+   "prompt": "Hero Bible + Animal Bible + Scene details"
+   }
+   ]
+   }
+   
+   FINAL REMINDER: The pages array MUST contain EXACTLY ${pagesCount} objects.`;
+
+    logger.info(`📖 Generating story with ${pagesCount} pages`);
     logger.info('🌐 ========== GEMINI STORY PROMPT AUDIT ==========');
     logger.info(`📜 FULL PROMPT: ${prompt}`);
     logger.info('🌐 ===============================================');
 
-    logger.info('Starting real Gemini API call for story generation');
-    const result = await model.generateContent(prompt);
-    logger.info('Gemini API response received');
-    
-    const responseText = (await result.response).text();
-    const storyData = JSON.parse(responseText.replace(/```json/g, '').replace(/```/g, ''));
-    
-    logger.info('✅ ========== STORY GENERATED SUCCESSFULLY ==========');
-    logger.info(`👶 Hero Bible: ${storyData.heroBible}`);
-    logger.info(`🐾 Animal Bible: ${storyData.animalBible}`);
-    
-    storyData.pages?.forEach((page, index) => {
-      logger.info(`📄 Page ${index + 1}: ${page.text.substring(0, 50)}...`);
-      logger.info(`🎨 Prompt ${index + 1}: ${page.prompt.substring(0, 50)}...`);
-    });
+    let storyData;
+    const maxRetries = parseInt(process.env.MAX_RETRY_ATTEMPTS || '5');
+    const retryDelay = parseInt(process.env.IMAGE_GENERATION_DELAY_MS || '15000');
 
-    const bookResult = await db.collection('books').insertOne({ ...storyData, childName, email, status: 'draft', createdAt: new Date() });
-    logger.info('✅ Story generated and saved to database', { bookId: bookResult.insertedId });
-    res.json({ success: true, bookId: bookResult.insertedId, ...storyData });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        logger.info(`Attempting Gemini API call (attempt ${attempt}/${maxRetries})`);
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        let storyText = response.text();
+
+        if (!storyText) throw new Error('No text content received');
+
+        let cleanText = storyText.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        storyData = JSON.parse(cleanText);
+        
+        logger.info('✅ JSON parsing successful');
+        logger.info('✅ ========== STORY GENERATED SUCCESSFULLY ==========');
+        logger.info(`👶 Hero Bible: ${storyData.heroBible}`);
+        logger.info(`🐾 Animal Bible: ${storyData.animalBible}`);
+        break;
+      } catch (err) {
+        const isRateLimit = JSON.stringify(err).includes('429') || err.message?.includes('429');
+        if (isRateLimit && attempt < maxRetries) {
+          logger.warn(`Gemini API rate limited (attempt ${attempt}/${maxRetries}), waiting...`);
+          await new Promise(r => setTimeout(r, retryDelay));
+          continue;
+        }
+        if (attempt === maxRetries) throw err;
+      }
+    }
+
+    const bookIdObj = new ObjectId();
+    const pagesWithUrls = storyData.pages.map(p => ({
+      ...p,
+      imageUrl: `https://via.placeholder.com/1024x1024.png?text=Painting+Page+${p.pageNumber}...`
+    }));
+
+    const bookDoc = {
+      _id: bookIdObj,
+      userId: email || null,
+      title: storyData.title,
+      childName,
+      age,
+      gender,
+      skinTone,
+      hairStyle,
+      hairColor,
+      language: language || 'English',
+      animal,
+      lesson,
+      occasion,
+      location,
+      characterStyle,
+      photoUrl: photoUrl || null,
+      heroBible: storyData.heroBible,
+      animalBible: storyData.animalBible,
+      finalPrompt: storyData.finalPrompt,
+      pages: pagesWithUrls,
+      status: email ? 'preview' : 'teaser',
+      isDigitalUnlocked: !!email,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await db.collection('books').insertOne(bookDoc);
+    logger.info('✅ Story generated and saved to database', { bookId: bookIdObj });
+
+    if (email) {
+      const recentBookEntry = {
+        id: bookIdObj.toString(),
+        title: bookDoc.title,
+        thumbnailUrl: pagesWithUrls[0]?.imageUrl || '',
+        status: bookDoc.status,
+        isDigitalUnlocked: true,
+        createdAt: bookDoc.createdAt
+      };
+      
+      await db.collection('users').updateOne(
+        { email: email.toLowerCase() },
+        { 
+          $inc: { storiesCount: 1 },
+          $push: { 
+            recentBooks: {
+              $each: [recentBookEntry],
+              $position: 0,
+              $slice: 2
+            }
+          },
+          $set: { updatedAt: new Date() } 
+        },
+        { upsert: true }
+      );
+    }
+
+    res.json({ success: true, bookId: bookIdObj.toString(), ...storyData });
   } catch (error) { 
     logger.error({ msg: 'Story gen failed', error: error.message });
     res.status(500).json({ error: error.message }); 

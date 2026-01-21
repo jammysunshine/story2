@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2 } from 'lucide-react'
 import axios from 'axios'
 import { 
   Sheet,
@@ -8,6 +8,9 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "../components/ui/sheet"
+import { Badge } from "../components/ui/badge"
+import { Button } from "../components/ui/button"
+import { useToast } from "../hooks/use-toast"
 
 const API_URL = 'http://localhost:3001/api'
 const TEASER_LIMIT = 7;
@@ -22,11 +25,14 @@ const options = {
 }
 
 export default function MainCreator() {
+  const { toast } = useToast()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [book, setBook] = useState<any>(null)
   const [user] = useState<any>(null)
-  const [photoUrl] = useState('')
+  const [photoUrl, setPhotoUrl] = useState('')
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [orders, setOrders] = useState<any[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   
@@ -69,6 +75,36 @@ export default function MainCreator() {
       setOrdersLoading(false);
     }
   }
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      const res = await axios.post(`${API_URL}/upload`, formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.url) {
+        setPhotoUrl(res.data.url);
+        toast({
+          title: "✨ Magic Link Established!",
+          description: "Your child's photo has been scanned.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Upload Failed",
+        description: "Please try again with a smaller image.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const generateStory = async () => {
     setLoading(true)
@@ -169,6 +205,52 @@ export default function MainCreator() {
           </div>
 
           <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl space-y-6">
+            {/* Magic Photo Scan */}
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${
+                photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
+              }`}
+            >
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handlePhotoUpload} 
+                className="hidden" 
+                accept="image/*" 
+              />
+              
+              {isUploading ? (
+                <div className="flex flex-col items-center">
+                  <Loader2 className="animate-spin text-primary mb-4" size={32} />
+                  <p className="text-[10px] font-black text-white uppercase tracking-widest">Scanning Magic Features...</p>
+                </div>
+              ) : photoUrl ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-green-500 mb-4 shadow-lg shadow-green-500/20">
+                    <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                  <h4 className="text-sm font-black text-green-400 uppercase tracking-widest mb-1">Magic Link Established</h4>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase">Character will sync with this photo</p>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); setPhotoUrl(''); }}
+                    className="mt-4 text-[8px] font-black uppercase text-red-400 hover:text-red-500 transition-colors flex items-center gap-1"
+                  >
+                    <Trash2 size={10} /> REMOVE PHOTO
+                  </button>
+                </div>
+              ) : (
+                 <>
+                   <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-white/5">
+                     <Camera className="text-slate-400 group-hover:text-primary transition-colors" size={32} />
+                   </div>
+                   <h4 className="text-lg font-black text-white uppercase tracking-widest mb-2">Magic Photo Scan</h4>
+                   <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed max-w-[200px]">Upload a photo to sync your child's features with the AI character.</p>
+                   <Badge variant="outline" className="mt-4 border-amber-500/30 text-amber-500 text-[8px] font-black uppercase bg-amber-500/5">Enable Character Sync</Badge>
+                 </>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
