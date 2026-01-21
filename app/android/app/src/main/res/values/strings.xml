@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AI Storytime</string>
+    <string name="title_activity_main">AI Storytime</string>
+    <string name="package_name">com.aistorytime.app</string>
+    <string name="custom_url_scheme">com.aistorytime.app</string>
+</resources>
