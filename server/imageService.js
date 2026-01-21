@@ -32,22 +32,34 @@ async function callGeminiImageGen(params) {
     const parts = [{ text: prompt }];
 
     if (referenceImages && referenceImages.length > 0) {
+      logger.info(`📸 [Page ${pageNumber}] Preparing ${referenceImages.length} references for Gemini...`);
       for (const ref of referenceImages) {
         try {
           const path = ref.uri.replace(`gs://${process.env.GCS_IMAGES_BUCKET_NAME}/`, "");
-          const [buffer] = await bucket.file(path).download();
-          const [metadata] = await bucket.file(path).getMetadata();
+          logger.debug(`📸 [Page ${pageNumber}] Resolved reference path: ${path}`);
+          const file = bucket.file(path);
+          const [metadata] = await file.getMetadata();
+          const [buffer] = await file.download();
           parts.push({
             inlineData: {
               data: buffer.toString("base64"),
               mimeType: metadata.contentType || "image/png",
             },
           });
+          logger.debug(`📸 [Page ${pageNumber}] Attached: ${path} (${metadata.contentType}, size: ${Math.round(buffer.length / 1024)} KB)`);
         } catch (e) {
-          logger.warn(`⚠️ [Page ${pageNumber}] Ref load fail: ${e.message}`);
+          logger.warn(`⚠️ [Page ${pageNumber}] Reference load fail: ${e.message}`);
         }
       }
     }
+
+    logger.info(`📡 [Page ${pageNumber}] Sending Gemini request (Prompt length: ${prompt.length}, Parts: ${parts.length})...`);
+    
+    parts.forEach((part, idx) => {
+      if (part.inlineData) {
+        logger.info(`📦 Part ${idx} size: ${Math.round(part.inlineData.data.length / 1024)} KB`);
+      }
+    });
 
     const result = await model.generateContent(parts.length > 1 ? parts : prompt);
     const response = await result.response;
@@ -62,6 +74,7 @@ async function callGeminiImageGen(params) {
         logger.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`);
         return imagePart.inlineData.data;
     }
+    logger.warn(`⚠️ [Page ${pageNumber}] Gemini Pro did not return an image.`);
     return null;
   } catch (err) {
     logger.error(`💥 [Page ${pageNumber}] Gemini Pro error: ${err.message}`);
@@ -111,15 +124,22 @@ async function paintPageWithRace(params) {
 async function generateImages(db, bookId, isFulfillment = false) {
   const pid = process.pid;
   logger.info(`🎯 ========== FUNCTION STARTED [PID:${pid}] ==========`);
-  logger.info(`🎯 Params: { bookId: ${bookId}, isFulfillment: ${isFulfillment} }`);
+  logger.info(`🎯 Params: { pagesCount: unknown, isFulfillment: ${isFulfillment} }`);
 
   const book = await db.collection("books").findOne({ _id: new ObjectId(bookId) });
-  if (!book) throw new Error("Book not found");
+  if (!book) {
+      logger.error(`🎯 Book not found: ${bookId}`);
+      throw new Error("Book not found");
+  }
+
+  logger.info(`🎯 Function execution continuing, book found`);
+  logger.info(`🎯 DB Record Status: { status: "${book.status}", pages: ${book.pages?.length} }`);
 
   const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
   const bucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
 
-  logger.info(`🎯 DB Record Status: { status: "${book.status}", pages: ${book.pages?.length} }`);
+  logger.info(`🔧 [IMAGE_GEN_DEBUG] Project ID from env: "${process.env.GCP_PROJECT_ID}"`);
+  logger.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path: "${process.env.GOOGLE_APPLICATION_CREDENTIALS}"`);
 
   // 1. CHARACTER PORTRAITS
   logger.info("📸 STEP 1: RESOLVING REFERENCE IMAGES (PARALLEL MEGA-RACE)");
@@ -169,6 +189,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
     prompt: book.finalPrompt || `Heartwarming final scene.`
   });
 
+  logger.info(`📊 Master array constructed: ${masterPages.length} pages total`);
   logger.info(`💾 Initializing DB with master array structure...`);
   await db.collection('books').updateOne(
     { _id: new ObjectId(bookId) },
@@ -184,7 +205,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
   // 3. PAINTING
   const paintPage = async (idx) => {
     const page = masterPages[idx];
-    if (page.imageUrl && !page.imageUrl.includes('placeholder')) return;
+    if (page.imageUrl && !page.imageUrl.includes('placeholder')) {
+        logger.info(`⏭️ [Page ${page.pageNumber}] Skipping (already painted)`);
+        return;
+    }
 
     logger.info(`🎨 [Page ${page.pageNumber}] Starting painting cycle...`);
     let charInstr = `Ref 1 is child, Ref 2 is animal. Visual consistency.`;
@@ -216,12 +240,12 @@ async function generateImages(db, bookId, isFulfillment = false) {
   logger.info(`✅ TEASER BATCH COMPLETE.`);
 
   if (isFulfillment) {
-    logger.info(`🚀 FIRING REGULAR BATCHES...`);
+    logger.info(`🚀 FIRING REGULAR BATCHES with a ${STORY_BATCH_DELAY_MS / 1000}s fire-and-forget delay...`);
     const regularIndices = masterPages.map((_, i) => i).filter(i => i >= TEASER_LIMIT);
     const BATCH_SIZE = 18;
     for (let i = 0; i < regularIndices.length; i += BATCH_SIZE) {
       const chunk = regularIndices.slice(i, i + BATCH_SIZE);
-      logger.info(`📦 Firing Batch ${Math.floor(i/BATCH_SIZE) + 1}...`);
+      logger.info(`📦 Firing Regular Batch ${Math.floor(i/BATCH_SIZE) + 1} (${chunk.length} pages)...`);
       await Promise.all(chunk.map(idx => paintPage(idx)));
       if (i + BATCH_SIZE < regularIndices.length) {
         logger.info(`⏳ Rate-limit safety wait (${STORY_BATCH_DELAY_MS/1000}s)...`);
@@ -230,6 +254,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
     }
   }
 
+  logger.info(`💾 ========== FINALIZING BOOK DOCUMENT ==========`);
   const finalStatus = isFulfillment ? 'preview' : 'teaser';
   await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
@@ -241,6 +266,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
           { email: book.email.toLowerCase(), "recentBooks.id": bookId },
           { $set: { "recentBooks.$.status": finalStatus, updatedAt: new Date() } }
       ).catch(e => logger.error('User sync fail:', e.message));
+      logger.info(`🎯 [GenerateImages][PID:${pid}] Dashboard Sync: Triggered for ${book.email}`);
   }
 
   logger.info(`🎯 [LIFECYCLE_TRACKER] PAINTING_COMPLETE: Book ${bookId}`);

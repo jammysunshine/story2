@@ -36,15 +36,19 @@ async function get7DaySignedUrl(pdfUrl) {
 async function generatePdf(db, bookId) {
   logger.info('🚀 [PDF TRACE] Starting generation process', { bookId });
 
+  logger.info('🚀 [PDF TRACE] Connected to DB, fetching book details');
   const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
-  if (!book) throw new Error('Book not found');
+
+  if (!book) {
+    throw new Error('Book not found');
+  }
 
   const projectId = process.env.GCP_PROJECT_ID;
+  logger.info(`🔍 [PDF_GEN_DEBUG] Project ID: "${projectId}"`);
+  const storage = new Storage({ projectId: projectId || undefined });
   const imagesBucketName = process.env.GCS_IMAGES_BUCKET_NAME;
-  const storage = new Storage({ projectId });
   const imagesBucket = storage.bucket(imagesBucketName);
   
-  // 1. GCS PRE-FLIGHT CHECK (Line-for-line from story1)
   const expectedImages = book.pages.length;
   let allImagesReady = false;
   const maxWaitTime = (expectedImages / 10) * 120000; 
@@ -75,8 +79,11 @@ async function generatePdf(db, bookId) {
       }
 
       const [exists] = await imagesBucket.file(fileName).exists();
-      if (exists) readyCount++;
-      else logger.debug(`⏳ [PDF TRACE] Missing image for P${page.pageNumber}: ${fileName}`);
+      if (exists) {
+        readyCount++;
+      } else {
+        logger.debug(`⏳ [PDF TRACE] Missing image for P${page.pageNumber}: ${fileName}`);
+      }
     }
 
     if (readyCount === expectedImages) {
@@ -90,11 +97,14 @@ async function generatePdf(db, bookId) {
     waited += pollInterval;
   }
 
-  // 2. PUPPETEER LAUNCH
   const chromePath = process.platform === 'darwin' 
     ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' 
     : '/usr/bin/chromium';
 
+  logger.info(`🔧 Using Chrome executable: ${chromePath}`);
+  logger.info(`🔧 Platform detected: ${process.platform}`);
+
+  logger.info('🚀 [PDF TRACE] Attempting to launch Chromium browser...');
   const browser = await puppeteer.launch({
     executablePath: chromePath,
     headless: 'new',
@@ -108,56 +118,89 @@ async function generatePdf(db, bookId) {
   });
 
   try {
+    logger.info('✅ [PDF TRACE] Browser launched successfully');
     const page = await browser.newPage();
     
-    // Exact diagnostic listeners
-    page.on('requestfailed', request => logger.warn(`❌ [PDF RESOURCE FAIL] ${request.url()} - ${request.failure()?.errorText}`));
-    page.on('response', response => { if (response.status() >= 400) logger.warn(`❌ [PDF RESOURCE 404] ${response.status()} - ${response.url()}`); });
-    page.on('console', msg => logger.info('PAGE CONSOLE:', msg.text()));
+    page.on('requestfailed', request => {
+      logger.warn(`❌ [PDF RESOURCE FAIL] ${request.url()} - ${request.failure()?.errorText}`);
+    });
+
+    page.on('response', response => {
+      if (response.status() >= 400) {
+        logger.warn(`❌ [PDF RESOURCE 404] ${response.status()} - ${response.url()}`);
+      }
+    });
+
+    page.on('console', (msg) => logger.info('PAGE CONSOLE:', msg.text()));
 
     await page.setViewport({ width: 2400, height: 3300, deviceScaleFactor: 1 });
 
     const mergedPdf = await PDFDocument.create();
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const totalActualPages = book.pages.length + 1;
+    const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');
+
+    logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
     const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
     
     await page.goto(fullTemplateUrl, { waitUntil: 'networkidle0', timeout: 120000 });
 
-    // Wait for all images to load
-    await page.evaluate(async () => {
+    logger.info('⏳ Waiting for all images to load in browser...');
+    const imageStatus = await page.evaluate(async () => {
       const images = Array.from(document.querySelectorAll('img'));
-      await Promise.all(images.map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+      return await Promise.all(images.map(img => {
+        if (img.complete) return Promise.resolve({ src: img.src, status: 'already_complete' });
+        return new Promise(resolve => {
+          img.onload = () => resolve({ src: img.src, status: 'loaded' });
+          img.onerror = () => resolve({ src: img.src, status: 'error' });
+        });
       }));
     });
 
-    const totalActualPages = book.pages.length + 1;
-    const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');
+    const failedImages = imageStatus.filter((s) => s.status === 'error');
+    if (failedImages.length > 0) {
+      logger.warn(`⚠️ ${failedImages.length} images failed to load in Puppeteer!`);
+    } else {
+      logger.info('✅ All images loaded successfully in browser.');
+    }
+
+    logger.info(`📖 Capturing ${totalActualPages} story pages...`);
 
     for (let i = 0; i < totalActualPages; i++) {
       logger.info(`📄 Slicing page ${i + 1}/${totalActualPages}...`);
       
       const pageInfo = await page.evaluate(async (index) => {
         const pages = document.querySelectorAll('.page');
-        let currentImgInfo = { src: 'none', decoded: false };
+        let currentImgInfo = { src: 'none', visible: false, complete: false, decoded: false, width: 0 };
+        
         for (let idx = 0; idx < pages.length; idx++) {
           const p = pages[idx];
           if (idx === index) {
             p.style.display = 'block';
             const img = p.querySelector('img');
-            if (img && img.src && img.src !== 'none') {
-                try { await img.decode(); currentImgInfo.decoded = true; } catch (e) {}
-                currentImgInfo.src = img.src.substring(0, 100);
+            if (img) {
+              try {
+                if (img.src && img.src !== 'none') {
+                  await img.decode();
+                  currentImgInfo.decoded = true;
+                }
+              } catch (e) {
+                currentImgInfo.decoded = false;
+              }
+              currentImgInfo.src = img.src.substring(0, 100) + '...';
+              currentImgInfo.visible = img.offsetParent !== null;
+              currentImgInfo.complete = img.complete;
+              currentImgInfo.width = img.naturalWidth;
             }
           } else {
             p.style.display = 'none';
           }
         }
-        return { img: currentImgInfo };
+        return { totalInDom: pages.length, img: currentImgInfo };
       }, i);
 
       logger.info(`🎯 Slice ${i+1} Diagnostic:`, pageInfo);
+
       await sleep(500);
 
       const pagePdfBuffer = await page.pdf({
@@ -170,28 +213,44 @@ async function generatePdf(db, bookId) {
       mergedPdf.addPage(copiedPage);
     }
 
-    // Filler logic
     if (mergedPdf.getPageCount() < GELATO_MIN_PAGES) {
       const fillerNeeded = GELATO_MIN_PAGES - mergedPdf.getPageCount();
-      const parchmentColor = rgb(1.0, 0.996, 0.961);
+      logger.info(`补充 [PDF TRACE] Adding ${fillerNeeded} filler pages to meet Gelato 28-page minimum.`);
+      
+      const parchmentColor = rgb(1.0, 0.996, 0.961); // #FFFEF5
+
       for (let f = 0; f < fillerNeeded; f++) {
         const fillerPage = mergedPdf.addPage([576, 792]);
-        fillerPage.drawRectangle({ x: 0, y: 0, width: 576, height: 792, color: parchmentColor });
+        fillerPage.drawRectangle({
+          x: 0, y: 0, width: 576, height: 792, color: parchmentColor,
+        });
       }
     }
-
     const finalPageCount = mergedPdf.getPageCount();
+
+    logger.info('🚀 [PDF TRACE] Merging and saving final PDF...', { finalPageCount });
     const pdfBytes = await mergedPdf.save();
+
     await browser.close();
 
+    logger.info('🚀 [PDF TRACE] Uploading PDF to GCS...');
     const pdfBucket = storage.bucket(process.env.GCS_PDFS_BUCKET_NAME);
     const fileName = `pdfs/${bookId}.pdf`;
-    await pdfBucket.file(fileName).save(Buffer.from(pdfBytes), { metadata: { contentType: 'application/pdf' } });
+    const file = pdfBucket.file(fileName);
+
+    await file.save(Buffer.from(pdfBytes), {
+      metadata: { contentType: 'application/pdf' }
+    });
 
     const pdfUrl = `https://storage.googleapis.com/${process.env.GCS_PDFS_BUCKET_NAME}/${fileName}`;
-    await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { finalPageCount, pdfUrl, status: 'pdf_ready', updatedAt: new Date() } });
+    
+    await db.collection('books').updateOne(
+      { _id: new ObjectId(bookId) },
+      { $set: { finalPageCount, pdfUrl, status: 'pdf_ready', updatedAt: new Date() } }
+    );
 
     logger.info('🎉 [PDF TRACE] FULFILLMENT COMPLETE', { bookId, pdfUrl, finalPageCount });
+
     return pdfUrl;
   } catch (error) {
     if (browser) await browser.close();
