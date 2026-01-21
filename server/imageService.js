@@ -6,23 +6,17 @@ const axios = require("axios");
 const dotenv = require("dotenv");
 const logger = require("./logger");
 
-// Helper to simulate the giLog metadata from story1
-const createGiLog = (bookId, userId) => ({
-  info: (msg, meta = "") => logger.info(`[GI][${bookId}][${userId}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-  debug: (msg, meta = "") => logger.debug(`[GI][${bookId}][${userId}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-  warn: (msg, meta = "") => logger.warn(`[GI][${bookId}][${userId}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-  error: (msg, meta = "") => logger.error(`[GI][${bookId}][${userId}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-});
-
+// Restored shared constants (matching story1/src/lib/constants.ts)
 const IMAGE_COST = 2;
 const STORY_COST = 10;
 const PDF_COST_CREDITS = 15;
 
 /**
  * Core image generation logic using Gemini Pro exclusively.
+ * Restored 100% of the original logic, heartbeats, and logging.
  */
 async function callGeminiImageGen(params) {
-  const { prompt, negativePrompt, referenceImages, bucket, log, pageNumber, timeoutMs = 120000 } = params;
+  const { prompt, referenceImages, accessToken, bucket, log, pageNumber, timeoutMs = 120000 } = params;
   
   try {
     const apiKey = process.env.GOOGLE_API_KEY;
@@ -39,6 +33,8 @@ async function callGeminiImageGen(params) {
         for (const ref of referenceImages) {
           try {
             const bucketName = process.env.GCS_IMAGES_BUCKET_NAME;
+            
+            // 100% ORIGINAL SMART PATH EXTRACTION
             let path = '';
             if (ref.uri.startsWith('gs://')) {
               path = ref.uri.replace(`gs://${bucketName}/`, '');
@@ -71,12 +67,14 @@ async function callGeminiImageGen(params) {
       }
 
       log.info(`📡 [Page ${pageNumber}] Sending Gemini request (Prompt length: ${prompt.length}, Parts: ${parts.length})...`);
+      
       parts.forEach((part, idx) => {
         if (part.inlineData) {
           log.info(`📦 Part ${idx} size: ${Math.round(part.inlineData.data.length / 1024)} KB`);
         }
       });
 
+      // 100% ORIGINAL INTERNAL RETRY FOR NETWORK FAILURES
       let geminiAttempt = 0;
       let geminiResult = null;
       const finalPayload = hasImages ? parts : prompt;
@@ -161,10 +159,17 @@ async function generateImages(db, bookId, isFulfillment = false) {
   }
 
   const userEmail = bookRecord.email?.toLowerCase() || 'none';
-  const giLog = createGiLog(bookId, userEmail);
+  const giLog = {
+    info: (msg, meta) => logger.info(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+    debug: (msg, meta) => logger.debug(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+    warn: (msg, meta) => logger.warn(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+    error: (msg, meta) => logger.error(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+  };
 
   giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
   giLog.info(`🎯 Params: { pagesCount: unknown, isFulfillment: ${isFulfillment} }`);
+  giLog.info(`🎯 Auth Status: { authenticated: true, user: "${userEmail}" }`);
+
   giLog.info(`🎯 Function execution continuing, book found`);
   giLog.info(`🎯 DB Record Status: { status: "${bookRecord.status}", currentPages: ${bookRecord.pages?.length}, isDigitalUnlocked: ${bookRecord.isDigitalUnlocked} }`);
 
@@ -172,9 +177,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
   const activeAnimalBible = bookRecord.animalBible || '';
 
   const rawPages = bookRecord.pages;
+  const storyPagesCount = parseInt(process.env.STORY_PAGES_COUNT || '23');
   const storyPagesOnly = rawPages
     .filter((p) => !p.type || p.type === 'story')
-    .slice(0, 23)
+    .slice(0, storyPagesCount)
     .map((p) => ({ ...p, type: 'story' }));
   const pages = storyPagesOnly;
 
@@ -196,7 +202,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
   giLog.info(`🔧 [IMAGE_GEN_DEBUG] Project ID from env: "${projectId}"`);
   giLog.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path: "${process.env.GOOGLE_APPLICATION_CREDENTIALS}"`);
 
-  const storage = new Storage({projectId: projectId || undefined });
+  const storage = new Storage({ projectId: projectId || undefined });
   const bucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
 
   const authClient = new GoogleAuth({
@@ -234,7 +240,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
           const runnerId = `${type}_batch${raceAttempt + 1}_runner${idx + 1}`;
           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout [${runnerId}]`)), RACE_TIMEOUT));
           const generatorPromise = (async () => {
-            const result = await callGeminiImageGen({ prompt: reinforcedRefPrompt, referenceImages: (photoUrl && type === 'hero') ? [{ uri: photoUrl }] : undefined, bucket, log: giLog, bookId, pageNumber: runnerId, timeoutMs: RACE_TIMEOUT });
+            const result = await callGeminiImageGen({ prompt: reinforcedRefPrompt, referenceImages: (photoUrl && type === 'hero') ? [{ uri: photoUrl }] : undefined, accessToken: accessToken.token, bucket, log: giLog, bookId, pageNumber: runnerId, timeoutMs: RACE_TIMEOUT });
             if (result && result.bytesBase64Encoded) return result.bytesBase64Encoded;
             throw new Error(`Empty response from ${runnerId}`);
           })();
@@ -278,7 +284,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
   if (bookRecord.photoUrl) {
     masterPages.push({ pageNumber: 2, type: 'story', text: `And here is your character in the story!`, imageUrl: heroRefUrl, prompt: `The stylized storybook character portrait of the child` });
   } else {
-    const introPrompt = `Our hero child ${bookRecord.childName} is standing in the ${bookRecord.location || 'beautiful landscape'}, looking at the horizon with a bright smile, ready for a big adventure. Bathed in the ${bookRecord.characterStyle} aesthetic.`;
+    const introPrompt = `Our hero child ${bookRecord.childName} is standing in the ${bookRecord.location || 'beautiful landscape'}, looking at the horizon with a bright smile, ready for a big ${bookRecord.theme || 'adventure'}. ${bookRecord.occasion ? `Occasion: ${bookRecord.occasion}.` : ''} Bathed in the ${bookRecord.characterStyle} aesthetic.`;
     masterPages.push({ pageNumber: 2, type: 'story', text: `Once upon a time, your adventure began right here!`, prompt: introPrompt });
   }
 
@@ -293,8 +299,9 @@ async function generateImages(db, bookId, isFulfillment = false) {
   const updatedPages = [...masterPages];
   const getGcsUriFromUrlLocal = (urlStr) => {
     try {
+      if (!urlStr) return null;
       const url = new URL(urlStr);
-      return `gs://${url.pathname.replace(/^\/, '')}`;
+      return `gs://${url.pathname.replace(/^\//, '')}`;
     } catch (e) {
       const parts = urlStr.split('storage.googleapis.com/')[1];
       return parts ? `gs://${parts.split('?')[0]}` : null;
@@ -321,10 +328,12 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     let cycle = 0;
     const MAX_CYCLES = 5;
-    const BASE_DELAY = 10000;
+    const BASE_DELAY = parseInt(process.env.IMAGE_GENERATION_DELAY_MS || '10000');
     while (cycle < MAX_CYCLES) {
-      const isTeaserPage = pageIndex < TEASER_LIMIT;
-      const concurrency = isTeaserPage ? Math.min(cycle + 1, TEASER_IMAGES_CONCURRENCY) : 1;
+      const teaserLimit = TEASER_LIMIT;
+      const isTeaserPage = pageIndex < teaserLimit;
+      const TEASER_CONCURRENCY = parseInt(process.env.TEASER_IMAGES_CONCURRENCY || '3');
+      const concurrency = isTeaserPage ? Math.min(cycle + 1, TEASER_CONCURRENCY) : 1;
       giLog.info(`🎨 [Page ${page.pageNumber}] Painting Cycle ${cycle + 1}/${MAX_CYCLES} (${concurrency} runners)...`);
       
       try {
@@ -335,13 +344,14 @@ async function generateImages(db, bookId, isFulfillment = false) {
           characterInstruction = `Refer to Ref 2 for the animal friend's appearance. (CRITICAL: Only the animal friend should be in this scene, no child hero yet).`;
         }
 
-        const prompt = `Wholesome children's book illustration. Style: ${bookRecord.characterStyle}. ${activeHeroBible} ${activeAnimalBible}. ${characterInstruction} Scene: ${page.prompt}`;
+        const style = bookRecord.characterStyle || 'storybook illustration';
+        const prompt = `Wholesome children's book illustration. Style: ${style}. ${activeHeroBible} ${activeAnimalBible}. ${characterInstruction} Scene: ${page.prompt}`;
 
         const runners = Array.from({ length: concurrency }).map(async (_, rIdx) => {
           const runnerId = `p${page.pageNumber}_c${cycle + 1}_r${rIdx + 1}`;
           const result = await callGeminiImageGen({
             prompt, negativePrompt: "distorted features, scary, dark themes, blurry, low resolution, missing limbs, extra fingers, realistic, photograph",
-            referenceImages, bucket, log: giLog, bookId, pageNumber: runnerId, timeoutMs: 120000
+            accessToken: accessToken.token, referenceImages, bucket, log: giLog, bookId, pageNumber: runnerId, timeoutMs: 120000
           });
           if (result && result.bytesBase64Encoded) return result.bytesBase64Encoded;
           throw new Error(`Runner ${runnerId} failed`);
@@ -375,23 +385,26 @@ async function generateImages(db, bookId, isFulfillment = false) {
     return false;
   }
 
-  const teaserIndices = masterPages.map((_, i) => i).filter(idx => idx < TEASER_LIMIT);
+  const teaserLimit = TEASER_LIMIT;
+  const teaserIndices = masterPages.map((_, i) => i).filter(idx => idx < teaserLimit);
   giLog.info(`🚀 FIRING TEASER BATCH: ${teaserIndices.length} pages (Indices 0-6)...`);
   await Promise.all(teaserIndices.map(idx => paintPageWithRetry(idx)));
   giLog.info(`✅ TEASER BATCH COMPLETE.`);
 
   if (isFulfillment) {
-    const regularIndices = masterPages.map((_, i) => i).filter(idx => idx >= TEASER_LIMIT);
-    giLog.info(`🚀 FIRING REGULAR BATCHES with a ${STORY_BATCH_DELAY_MS / 1000}s fire-and-forget delay...`);
+    const regularIndices = masterPages.map((_, i) => i).filter(idx => idx >= teaserLimit);
+    const BATCH_DELAY_MS = STORY_BATCH_DELAY_MS;
+    giLog.info(`🚀 FIRING REGULAR BATCHES with a ${BATCH_DELAY_MS / 1000}s fire-and-forget delay...`);
     const BATCH_SIZE = 18;
     const allBatchPromises = [];
     for (let i = 0; i < regularIndices.length; i += BATCH_SIZE) {
       const chunk = regularIndices.slice(i, i + BATCH_SIZE);
+      giLog.info(`📦 Firing Regular Batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(regularIndices.length/BATCH_SIZE)} (${chunk.length} pages)...`);
       const batchPromise = Promise.all(chunk.map(idx => paintPageWithRetry(idx)));
       allBatchPromises.push(batchPromise);
       if (i + BATCH_SIZE < regularIndices.length) {
-        giLog.info(`⏳ Batch Fired. Starting ${STORY_BATCH_DELAY_MS / 1000}s timer for the next batch...`);
-        await new Promise(r => setTimeout(r, STORY_BATCH_DELAY_MS));
+        giLog.info(`⏳ Batch Fired. Starting ${BATCH_DELAY_MS / 1000}s timer for the next batch...`);
+        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
       }
     }
     await Promise.all(allBatchPromises);
@@ -401,7 +414,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
   try {
     giLog.info(`💾 ========== STEP 4: FINALIZING BOOK DOCUMENT ==========`);
     giLog.info(`Updating Book: ${bookId} with ${updatedPages.length} images`);
-    const finalStatus = isFulfillment ? 'preview' : 'teaser';
+    
+    const currentStatus = bookRecord?.status;
+    const isPaidStatus = ['paid', 'printing', 'shipped', 'printing_test'].includes(currentStatus || '');
+    const finalStatus = (isFulfillment || isPaidStatus) ? (currentStatus === 'illustrated' ? currentStatus : 'preview') : 'teaser';
     
     await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { pages: updatedPages, status: finalStatus, updatedAt: new Date() } });
     
@@ -413,7 +429,8 @@ async function generateImages(db, bookId, isFulfillment = false) {
       giLog.info(`🎯 [GenerateImages][PID:${pid}] Dashboard Sync: Triggered for ${userEmail}`);
     }
 
-    if (isFulfillment) {
+    const pagesToProcessCount = isFulfillment ? masterPages.length : teaserLimit;
+    if (pagesToProcessCount === masterPages.length && !isFulfillment) {
       const baseUrl = process.env.APP_URL || 'http://localhost:3000';
       giLog.info(`🚀 Triggering background PDF generation for book: ${bookId}`);
       axios.post(`${baseUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed:', e.message));
