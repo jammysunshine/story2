@@ -198,10 +198,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
       });
     });
 
-  const projectId = process.env.GCP_PROJECT_ID;
-  const rawKeyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  const path = require('path');
-  const keyPath = path.isAbsolute(rawKeyPath) ? rawKeyPath : path.resolve(process.cwd(), '..', rawKeyPath);
+   const projectId = process.env.GCP_PROJECT_ID;
+   const rawKeyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+   const path = require('path');
+   const keyPath = path.isAbsolute(rawKeyPath) ? rawKeyPath : path.resolve(process.cwd(), rawKeyPath);
 
   giLog.info(`🔧 [IMAGE_GEN_DEBUG] Project ID from env: "${projectId}"`);
   giLog.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path (Resolved): "${keyPath}"`);
