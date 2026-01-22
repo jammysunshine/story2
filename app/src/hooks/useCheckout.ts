@@ -10,7 +10,7 @@ export const useCheckout = () => {
 
     try {
       // Call backend to create checkout session
-      const response = await fetch('http://localhost:3001/api/create-checkout', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/create-checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

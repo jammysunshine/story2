@@ -1,17 +1,6 @@
-import { loadStripe, Stripe } from '@stripe/stripe-js';
-
-let stripePromise: Promise<Stripe | null>;
-
-export const getStripe = () => {
-  if (!stripePromise) {
-    const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || import.meta.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
-
-    if (!publishableKey) {
-      console.error('❌ Stripe publishable key is missing. Please set NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY in your .env file.');
-      return Promise.resolve(null);
-    }
-
-    stripePromise = loadStripe(publishableKey);
-  }
-  return stripePromise;
+// This file is kept for potential future use of direct Stripe integration
+// Currently, we're using server-side checkout sessions which don't require the publishable key on the frontend
+export const getStripe = async () => {
+  // For now, we don't need to initialize Stripe on the frontend since we're using server-side redirects
+  return null;
 };
