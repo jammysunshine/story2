@@ -19,6 +19,29 @@ dotenv.config();
 
 const app = express();
 
+// --- STARTUP CONFIGURATION CHECK ---
+const REQUIRED_ENV_VARS = [
+  'GOOGLE_API_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  'GCP_PROJECT_ID',
+  'GCS_IMAGES_BUCKET_NAME',
+  'GOOGLE_CLIENT_ID',
+  'MONGODB_URI',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'APP_URL'
+];
+
+const missingVars = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+  logger.error('❌ CRITICAL ERROR: Missing required environment variables:');
+  missingVars.forEach(v => logger.error(`   - ${v}`));
+  logger.error('The server will now exit. Please fix your .env file.');
+  process.exit(1);
+} else {
+  logger.info('✅ Environment variable check passed.');
+}
+
 // --- GLOBAL SAFETY NETS ---
 process.on('uncaughtException', (err) => {
   logger.error('🔥 CRITICAL: Uncaught Exception!', { message: err.message, stack: err.stack });
@@ -54,6 +77,15 @@ async function connectDB() {
 }
 
 // --- SECURITY: SIGNED URLS ---
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    database: db ? 'connected' : 'disconnected'
+  });
+});
 
 async function getSignedUrl(gcsPath) {
   if (!gcsPath) return null;

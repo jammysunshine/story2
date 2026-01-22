@@ -278,7 +278,9 @@ export default function MainCreator() {
     try {
       const res = await axios.post(`${API_URL}/generate-story`, { ...formData, photoUrl, email: user?.email })
       console.warn('✅ FRONTEND: Story Generated Successfully', res.data);
-      setBook(res.data)
+      // Ensure we have a consistent bookId key
+      const bookData = { ...res.data, bookId: res.data.bookId || res.data._id || res.data.id };
+      setBook(bookData)
       setStep(2)
     } catch (err: any) { 
       console.error('❌ FRONTEND: Story Generation Failed', err.message);
@@ -305,10 +307,10 @@ export default function MainCreator() {
   const renderSelect = (label: string, field: string, choices: string[]) => (
     <div>
       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">{label}</label>
-      <select 
-        value={(formData as any)[field]} 
+      <select
+        value={(formData as any)[field]}
         onChange={e => setFormData({...formData, [field]: e.target.value})}
-        className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm"
+        className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm border border-transparent focus:border-primary/30 transition-all"
       >
         {choices.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
@@ -445,7 +447,7 @@ export default function MainCreator() {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
-                <input value={formData.childName} onChange={e => setFormData({...formData, childName: e.target.value})} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all" placeholder="e.g. Henry" />
+                <input value={formData.childName} onChange={e => setFormData({...formData, childName: e.target.value})} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30" placeholder="e.g. Henry" />
               </div>
               
               {renderSelect('Age', 'age', ['3','4','5','6','7','8','9','10'])}
@@ -465,8 +467,8 @@ export default function MainCreator() {
             </div>
           </div>
 
-          <button onClick={generateStory} disabled={loading} className="w-full h-20 bg-primary text-white rounded-[1.5rem] font-black text-xl shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-50">
-            {loading ? <Loader2 className="animate-spin" /> : <Wand2 />} 
+          <button onClick={generateStory} disabled={loading} className="w-full h-20 bg-primary text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-primary/30 hover:scale-[1.02]">
+            {loading ? <Loader2 className="animate-spin" /> : <Wand2 />}
             Write My Story
           </button>
         </div>
@@ -486,8 +488,8 @@ export default function MainCreator() {
               </div>
             ))}
           </div>
-          <button onClick={startPainting} disabled={loading} className="w-full h-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-[1.5rem] font-black text-xl shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-transform disabled:opacity-50">
-            {loading ? <Loader2 className="animate-spin" /> : <Sparkles />} 
+          <button onClick={startPainting} disabled={loading} className="w-full h-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-blue-500/30 hover:scale-[1.02]">
+            {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Approve & Illustrate
           </button>
           <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px]">Edit Hero Details</button>
@@ -543,39 +545,52 @@ export default function MainCreator() {
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
             <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
             <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
-            <button
-              onClick={async () => {
-                let currentUser = user;
-                if (!currentUser) {
-                  toast({ title: "Login Required", description: "Please sign in to order your book!" });
-                  currentUser = await login();
-                  if (!currentUser) return; // User cancelled login
-                }
-                
-                if (book && book.bookId && book.title) {
-                  createCheckoutSession(book.bookId, book.title);
-                } else {
-                  toast({
-                    title: "Error",
-                    description: "Book information not available. Please try again.",
-                    variant: "destructive"
-                  });
-                }
-              }}
-              disabled={checkoutLoading}
-              className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-            >
-              {checkoutLoading ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  Order Hardcover ($25)
-                </>
+            
+            <div className="flex flex-col gap-4">
+              {book.pdfUrl && (
+                <button
+                  onClick={() => window.open(book.pdfUrl, '_blank')}
+                  className="w-full h-14 bg-slate-800 text-white rounded-xl font-bold text-lg border border-white/10 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <ExternalLink size={20} />
+                  View Digital PDF
+                </button>
               )}
-            </button>
+
+              <button
+                onClick={async () => {
+                  let currentUser = user;
+                  if (!currentUser) {
+                    toast({ title: "Login Required", description: "Please sign in to order your book!" });
+                    currentUser = await login();
+                    if (!currentUser) return; // User cancelled login
+                  }
+                  
+                  if (book && book.bookId && book.title) {
+                    createCheckoutSession(book.bookId, book.title);
+                  } else {
+                    toast({
+                      title: "Error",
+                      description: "Book information not available. Please try again.",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                disabled={checkoutLoading}
+                className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                {checkoutLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Order Hardcover ($25)
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
