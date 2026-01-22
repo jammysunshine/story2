@@ -1,8 +1,12 @@
 const pino = require('pino');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
-  transport: {
+  // In GCloud/Production, we log raw JSON to stdout. 
+  // In development, we use pino-pretty for human-readable logs.
+  transport: isProduction ? undefined : {
     target: 'pino-pretty',
     options: {
       colorize: true,

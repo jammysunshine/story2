@@ -36,7 +36,7 @@ app.use((req, res, next) => {
 app.use(cors());
 
 const port = process.env.PORT || 3001;
-const TEASER_LIMIT = 7;
+const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 
 // Initialize Services
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -207,7 +207,7 @@ app.post('/api/generate-story', async (req, res) => {
    - Appearance: Friendly expression, bright expressive eyes, wearing simple colorful children's clothing.
    ANIMAL BIBLE (The Animal):
    - Species: "${animal}"
-   - Appearance: A friendly and cute ${animal.toLowerCase()} with gentle eyes and typical features for its species.
+   - Appearance: A friendly, cute, and highly expressive ${animal.toLowerCase()} with gentle eyes and distinct features. Describe its fur/skin texture, any unique markings, and its endearing personality in the Bible paragraph.
    - Artistic style for both: "${characterStyle}"
    IMPORTANT: You must create EXACTLY ${pagesCount} pages. Not more, not less.
    For the ${pagesCount}-page story:
@@ -365,9 +365,20 @@ app.get('/api/orders', async (req, res) => {
 
 app.get('/api/book-status', async (req, res) => {
   const { bookId } = req.query;
-  const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
-  const securedPages = await Promise.all(book.pages.map(async p => ({ ...p, imageUrl: await getSignedUrl(p.imageUrl) })));
-  res.json({ status: book.status, pages: securedPages, pdfUrl: await get7DaySignedUrl(book.pdfUrl) });
+  try {
+    if (!bookId || !ObjectId.isValid(bookId)) {
+      return res.status(400).json({ error: 'Invalid or missing bookId' });
+    }
+    const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+    if (!book) {
+      return res.status(404).json({ error: 'Book not found' });
+    }
+    const securedPages = await Promise.all((book.pages || []).map(async p => ({ ...p, imageUrl: await getSignedUrl(p.imageUrl) })));
+    res.json({ status: book.status, pages: securedPages, pdfUrl: await get7DaySignedUrl(book.pdfUrl) });
+  } catch (error) {
+    logger.error(`Error in /api/book-status: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/generate-pdf', async (req, res) => {

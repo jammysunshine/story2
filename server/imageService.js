@@ -7,9 +7,10 @@ const dotenv = require("dotenv");
 const logger = require("./logger");
 
 // Restored shared constants (matching story1/src/lib/constants.ts)
-const IMAGE_COST = 2;
-const STORY_COST = 10;
-const PDF_COST_CREDITS = 15;
+const IMAGE_COST = parseInt(process.env.IMAGE_COST || '2');
+const STORY_COST = parseInt(process.env.STORY_COST || '10');
+const PDF_COST_CREDITS = parseInt(process.env.PDF_COST_CREDITS || '15');
+const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 
 /**
  * Core image generation logic using Gemini Pro exclusively.

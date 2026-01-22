@@ -20,10 +20,21 @@ const TEASER_LIMIT = 7;
 const options = {
   genders: ['Boy', 'Girl'],
   skinTones: ['Fair', 'Light', 'Medium', 'Tan', 'Deep'],
-  hairStyles: ['Short', 'Long', 'Curly', 'Wavy', 'Straight', 'Braids', 'Afro'],
-  hairColors: ['Black', 'Brown', 'Blonde', 'Red', 'Gray'],
-  styles: ['Studio Ghibli style', 'Disney-inspired 3D render', 'Classic watercolor', 'Pixar character design'],
-  locations: ['Magical Forest', 'Deep Ocean', 'Outer Space', 'Castle', 'Dinosaur Jungle']
+  hairStyles: [
+    'Short', 'Long', 'Curly', 'Wavy', 'Straight', 'Braids', 'Bald', 
+    'Pigtails', 'Ponytail', 'Bun', 'Bob cut', 'Pixie cut', 'Afro', 'Space buns'
+  ],
+  hairColors: ['Black', 'Brown', 'Blonde', 'Red', 'Gray', 'White'],
+  styles: [
+    'Studio Ghibli style', 'Disney-inspired 3D render', 'Classic watercolor', 
+    'Pixar character design', 'Hayao Miyazaki illustration', 'Papercut art', 
+    'Oil painting style', 'Chalk drawing'
+  ],
+  locations: [
+    'Magical Forest', 'Deep Ocean', 'Outer Space', 'Castle', 'Dinosaur Jungle',
+    'Jungle', 'Mountain', 'Desert', 'Garden', 'Village', 'Zoo', 
+    'Underwater City', 'Cloud Kingdom', 'Ice Palace', 'Magical Library'
+  ]
 }
 
 const randomNames = ['Emma', 'Liam', 'Olivia', 'Noah', 'Ava', 'William', 'Sophia', 'James', 'Isabella', 'Benjamin', 'Mia', 'Lucas', 'Charlotte', 'Henry', 'Amelia', 'Theo', 'Luna', 'Leo', 'Zoe', 'Jack'];
@@ -337,7 +348,7 @@ export default function MainCreator() {
               {renderSelect('Skin Tone', 'skinTone', options.skinTones)}
               {renderSelect('Hair Style', 'hairStyle', options.hairStyles)}
               {renderSelect('Hair Color', 'hairColor', options.hairColors)}
-              {renderSelect('Animal Friend', 'animal', ['Lion', 'Dragon', 'Unicorn', 'Elephant', 'Cat'])}
+              {renderSelect('Animal Friend', 'animal', randomAnimals)}
             </div>
 
             <Separator />
