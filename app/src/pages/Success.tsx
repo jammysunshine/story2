@@ -113,14 +113,14 @@ export default function SuccessPage() {
           </div>
         ) : (
           <a href={pdfUrl} target="_blank" className="w-full max-w-md animate-in zoom-in duration-1000">
-            <button className="w-full h-24 bg-green-600 text-white rounded-[2rem] font-black text-2xl uppercase tracking-widest shadow-2xl shadow-green-500/30 flex items-center justify-center gap-4 hover:scale-[1.02] transition-all active:scale-95 group">
+            <button className="w-full h-24 bg-green-600 text-white rounded-[2rem] font-black text-2xl uppercase tracking-widest shadow-2xl shadow-green-500/30 flex items-center justify-center gap-4 hover:scale-[1.02] transition-all active:scale-95 group hover:shadow-green-500/40">
               <FileDown size={32} className="group-hover:translate-y-1 transition-transform" /> Download PDF
             </button>
           </a>
         )}
 
         <div className="flex flex-col gap-4 w-full max-w-md">
-          <Link to="/" className="w-full h-16 bg-white text-slate-900 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-slate-100 active:scale-98 transition-all group">
+          <Link to="/" className="w-full h-16 bg-white text-slate-900 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-slate-100 active:scale-98 transition-all group hover:shadow-2xl hover:shadow-primary/20">
             Create Another Adventure <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform text-primary" />
           </Link>
           <p className="text-center text-slate-600 font-bold text-[10px] uppercase tracking-[0.3em]">Thank you for your magic!</p>

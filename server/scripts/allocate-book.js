@@ -32,9 +32,11 @@ async function allocateUnallocatedBooks() {
 
     console.log(`Found ${unallocatedBooks.length} unallocated books. Allocating to ${USER_EMAIL}...`);
 
+    let processed = 0;
     for (const book of unallocatedBooks) {
+      processed++;
       const bookId = book._id.toString();
-      console.log(`Processing book ${bookId}`);
+      console.log(`Processing book ${processed}/${unallocatedBooks.length}: ${bookId}`);
 
       // Update the book
       console.log(`Updating book ${bookId} in DB`);

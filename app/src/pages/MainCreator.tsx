@@ -310,7 +310,7 @@ export default function MainCreator() {
       <select
         value={(formData as any)[field]}
         onChange={e => setFormData({...formData, [field]: e.target.value})}
-        className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm border border-transparent focus:border-primary/30 transition-all"
+        className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm border border-transparent focus:border-primary/30 transition-all shadow-sm focus:shadow-lg focus:shadow-primary/10"
       >
         {choices.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
@@ -327,7 +327,7 @@ export default function MainCreator() {
           {user && (
             <Sheet onOpenChange={(open) => open && fetchOrders()}>
               <SheetTrigger asChild>
-                <button className="p-2 bg-slate-800 rounded-xl border border-white/5 relative">
+                <button className="p-2 bg-slate-800 rounded-xl border border-white/5 relative hover:bg-slate-700/50 transition-colors">
                   <Package size={18} />
                   {orders.length > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />}
                 </button>
@@ -375,10 +375,10 @@ export default function MainCreator() {
           {user ? (
             <div className="flex items-center gap-3">
               <div className="bg-slate-800 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-white/10">{user.name.split(' ')[0]}</div>
-              <button onClick={logout} className="text-[10px] font-black text-slate-500 uppercase hover:text-red-400 transition-colors">Logout</button>
+              <button onClick={logout} className="text-[10px] font-black text-slate-500 uppercase hover:text-red-400 transition-colors hover:underline">Logout</button>
             </div>
           ) : (
-            <button onClick={login} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all">Login</button>
+            <button onClick={login} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30 hover:scale-[1.02]">Login</button>
           )}
         </div>
       </header>
@@ -390,7 +390,7 @@ export default function MainCreator() {
             <Button
               variant="outline"
               onClick={randomizeFormData}
-              className="rounded-full border-primary/30 text-primary hover:bg-primary/10 h-10 px-6 text-xs font-black uppercase tracking-widest"
+              className="rounded-full border-primary/30 text-primary hover:bg-primary/10 h-10 px-6 text-xs font-black uppercase tracking-widest hover:shadow-lg hover:shadow-primary/20 transition-all"
             >
               <Sparkles className="w-4 h-4 mr-2" />
               Surprise Me
@@ -399,11 +399,11 @@ export default function MainCreator() {
 
           <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl space-y-6">
             {/* Magic Photo Scan */}
-            <div 
+            <div
               onClick={() => fileInputRef.current?.click()}
               className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${
                 photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
-              }`}
+              } hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] transition-transform`}
             >
               <input 
                 type="file" 
@@ -447,7 +447,7 @@ export default function MainCreator() {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
-                <input value={formData.childName} onChange={e => setFormData({...formData, childName: e.target.value})} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30" placeholder="e.g. Henry" />
+                <input value={formData.childName} onChange={e => setFormData({...formData, childName: e.target.value})} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
               </div>
               
               {renderSelect('Age', 'age', ['3','4','5','6','7','8','9','10'])}
@@ -492,7 +492,7 @@ export default function MainCreator() {
             {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Approve & Illustrate
           </button>
-          <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px]">Edit Hero Details</button>
+          <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-400 transition-colors">Edit Hero Details</button>
         </div>
       )}
 
@@ -599,5 +599,5 @@ export default function MainCreator() {
 }
 
 function Separator() {
-  return <div className="h-px bg-white/5 w-full my-4" />;
+  return <div className="h-px bg-white/10 w-full my-6" />;
 }
