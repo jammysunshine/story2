@@ -137,10 +137,16 @@ export default function MainCreator() {
     let interval: any;
     if (step === 3 && book?.bookId) {
       const poll = async () => {
-        const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
-        if (res.data.status === 'teaser' || res.data.status === 'illustrated') {
-          setBook({ ...book, pages: res.data.pages });
-          if (res.data.status === 'illustrated') clearInterval(interval);
+        try {
+          const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
+          console.log('Polled book status:', res.data.status, 'Pages with images:', res.data.pages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length);
+          if (res.data.status === 'teaser' || res.data.status === 'illustrated') {
+            console.log('Updating book pages in UI');
+            setBook({ ...book, pages: res.data.pages });
+            if (res.data.status === 'illustrated') clearInterval(interval);
+          }
+        } catch (e) {
+          console.error('Polling failed', e);
         }
       };
       poll(); // Poll immediately
