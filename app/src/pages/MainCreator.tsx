@@ -86,25 +86,34 @@ export default function MainCreator() {
   const login = async () => {
     try {
       const googleUser = await GoogleAuth.signIn();
+      const idToken = googleUser.authentication.idToken;
+      
       const res = await axios.post(`${API_URL}/auth/social`, {
-        token: googleUser.authentication.idToken,
+        token: idToken,
         provider: 'google'
       });
+      
       if (res.data.success) {
-        setUser(res.data.user);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
+        // Store both user profile and token
+        const userData = { ...res.data.user, token: idToken };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
         toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
+        return userData; // Return for chaining
       }
     } catch (err) {
       console.error('Login failed', err);
       toast({ title: "Login Failed", description: "Could not sign in with Google", variant: "destructive" });
     }
+    return null;
   };
 
   const logout = async () => {
     await GoogleAuth.signOut();
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('book');
+    localStorage.removeItem('step');
   };
 
   const [photoUrl, setPhotoUrl] = useState('')
@@ -218,10 +227,12 @@ export default function MainCreator() {
   }, [step, book?.bookId]);
 
   const fetchOrders = async () => {
-    if (!user?.email) return;
+    if (!user?.token) return;
     setOrdersLoading(true);
     try {
-      const res = await axios.get(`${API_URL}/orders?email=${user.email}`);
+      const res = await axios.get(`${API_URL}/orders`, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
       setOrders(res.data.orders);
     } catch (err) {
       console.error('Failed to fetch orders');
@@ -501,7 +512,7 @@ export default function MainCreator() {
                         src={p.imageUrl}
                         className="w-full h-full object-cover"
                         alt={`Page ${i+1}`}
-                        onError={(e) => {
+                        onError={() => {
                           console.error(`Failed to load image: ${p.imageUrl}`);
                           // If image fails to load, it might be an expired signed URL
                           // We can't easily trigger a single page refresh here without complex state,
@@ -533,9 +544,16 @@ export default function MainCreator() {
             <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
             <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
             <button
-              onClick={() => {
-                if (book && book._id && book.title) {
-                  createCheckoutSession(book._id, book.title);
+              onClick={async () => {
+                let currentUser = user;
+                if (!currentUser) {
+                  toast({ title: "Login Required", description: "Please sign in to order your book!" });
+                  currentUser = await login();
+                  if (!currentUser) return; // User cancelled login
+                }
+                
+                if (book && book.bookId && book.title) {
+                  createCheckoutSession(book.bookId, book.title);
                 } else {
                   toast({
                     title: "Error",

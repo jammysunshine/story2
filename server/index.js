@@ -363,11 +363,26 @@ app.post('/api/generate-images', async (req, res) => {
 });
 
 app.get('/api/orders', async (req, res) => {
-  const { email } = req.query;
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
   try {
+    const ticket = await googleClient.verifyIdToken({ 
+      idToken: token, 
+      audience: process.env.GOOGLE_CLIENT_ID 
+    });
+    const payload = ticket.getPayload();
+    const email = payload.email;
+
     const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
     res.json({ success: true, orders });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    logger.error('Order fetch failed:', error.message);
+    res.status(401).json({ error: 'Invalid token' }); 
+  }
 });
 
 app.get('/api/book-status', async (req, res) => {
