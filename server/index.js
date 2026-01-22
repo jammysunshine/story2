@@ -397,35 +397,216 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
   const sig = req.headers['stripe-signature'];
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) { return res.status(400).send(`Webhook Error: ${err.message}`); }
+    // Need to get raw body for signature verification
+    const requestBody = await getRawBody(req);
+    event = stripe.webhooks.constructEvent(requestBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    logger.error(`❌ Webhook signature verification failed: ${err.message}`);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const bookId = session.metadata.bookId;
     const email = session.customer_details.email;
+    const type = session.metadata.type || 'book'; // default to book if not specified
 
-    logger.info(`💰 Payment Received for Book ${bookId} from ${email}`);
+    logger.info(`💰 Payment Received for Book ${bookId} from ${email}`, { type });
 
     // 1. Create Order Record
-    await db.collection('orders').insertOne({
+    const shipping = session.shipping_details;
+    const address = shipping?.address || session.customer_details?.address;
+    const nameParts = (shipping?.name || session.customer_details?.name || 'Customer').split(' ');
+
+    const orderData = {
       bookId: new ObjectId(bookId),
-      email,
-      amount: session.amount_total / 100,
-      currency: session.currency,
-      status: 'Printing',
-      shippingAddress: session.shipping_details?.address || {},
-      createdAt: new Date()
-    });
+      userId: email,
+      stripeSessionId: session.id,
+      amount: session.amount_total ? session.amount_total / 100 : 0,
+      currency: session.currency?.toUpperCase(),
+      status: 'paid',
+      type: type,
+      shippingAddress: {
+        firstName: nameParts[0] || 'Customer',
+        lastName: nameParts.slice(1).join(' ') || '',
+        addressLine1: address?.line1 || '',
+        addressLine2: address?.line2 || '',
+        city: address?.city || '',
+        state: address?.state || '',
+        postCode: address?.postal_code || '',
+        country: address?.country || 'AU',
+        email: email,
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await db.collection('orders').insertOne(orderData);
 
     // 2. Update Book Status
-    await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { status: 'paid' } });
-    
-    // 3. Trigger Background Tasks (Painting + PDF + Gelato)
-    // ... logic would go here
+    const bookUpdate = {
+      status: type === 'digital' ? 'paid' : 'paid', // Both digital and physical go to 'paid' initially
+      isDigitalUnlocked: true,
+      customerEmail: session.customer_details?.email,
+      updatedAt: new Date()
+    };
+
+    if (type === 'digital') {
+      bookUpdate.status = 'pdf_ready'; // Digital orders go straight to pdf_ready
+    }
+
+    await db.collection('books').updateOne(
+      { _id: new ObjectId(bookId) },
+      { $set: bookUpdate }
+    );
+
+    // 3. Update user's recent books
+    await db.collection('users').updateOne(
+      { email: email.toLowerCase(), "recentBooks.id": bookId },
+      {
+        $set: {
+          "recentBooks.$.status": bookUpdate.status,
+          "recentBooks.$.isDigitalUnlocked": true,
+          updatedAt: new Date()
+        }
+      }
+    ).catch((e) => logger.error('Failed to sync status to recentBooks:', e));
+
+    // 4. Trigger Background Tasks (Painting + PDF + Gelato)
+    // Run these as background tasks
+    handleCheckoutComplete(session, bookId, db, type).catch(err => {
+      logger.error('Fulfillment Background Task Failed:', err);
+    });
   }
+
   res.json({ received: true });
 });
+
+// Helper function to get raw body for webhook signature verification
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      resolve(body);
+    });
+    req.on('error', reject);
+  });
+}
+
+// Background fulfillment function
+async function handleCheckoutComplete(session, bookId, db, type = 'book') {
+  try {
+    logger.info(`🏁 [LIFECYCLE_TRACKER] STARTING fulfillment for Book: ${bookId}`);
+
+    // 1. Trigger Image Generation (Painting the rest of the book)
+    logger.info(`🎨 Kicking off image generation for Stripe order: ${bookId}`);
+    try {
+      const currentBook = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+
+      if (currentBook) {
+        logger.info(`🎨 Webhook calling generateImages: bookId=${bookId}`);
+
+        // This function handles the expansion to all pages and skips already-painted images
+        await generateImages(db, bookId, true); // true indicates this is a fulfillment call
+        logger.info('✅ Image generation finished for Stripe order.');
+      }
+    } catch (genError) {
+      logger.error('❌ Failed to generate images for Stripe order:', genError);
+    }
+
+    // 2. Trigger PDF generation (Now safe because images are done)
+    logger.info(`📄 Triggering PDF generation for: ${bookId}`);
+
+    const pdfResponse = await fetch(`${process.env.APP_URL || 'http://localhost:3001'}/api/generate-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bookId }),
+    });
+
+    if (!pdfResponse.ok) {
+      throw new Error(`PDF generation failed: ${pdfResponse.statusText}`);
+    }
+
+    const { pdfUrl } = await pdfResponse.json();
+    logger.info(`✅ PDF generated successfully: ${pdfUrl}`);
+
+    // 3. FETCH LATEST BOOK TO CHECK FOR PLACEHOLDERS BEFORE PRINTING
+    const bookRecord = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+
+    const placeholders = bookRecord?.pages?.filter((p) =>
+      !p.imageUrl ||
+      p.imageUrl.includes('via.placeholder.com') ||
+      p.imageUrl.includes('placeholder.png') ||
+      p.imageUrl.includes('Painting+Page')
+    );
+
+    const hasPlaceholders = placeholders && placeholders.length > 0;
+
+    if (hasPlaceholders) {
+      logger.error('🚨🚨🚨 [CRITICAL FULFILLMENT ERROR] 🚨🚨🚨');
+      logger.error(`Book ${bookId} contains MISSING or PLACEHOLDER IMAGES.`);
+      logger.error('Missing Pages Summary:', placeholders.map((p) => ({
+        pageNumber: p.pageNumber,
+        urlPreview: p.imageUrl?.substring(0, 50) || 'NULL'
+      })));
+      logger.error('GELATO PRINTING ABORTED to prevent printing a defective book.');
+      logger.error('Manual intervention required: Regenerate missing images and trigger printing manually.');
+
+      await db.collection('books').updateOne(
+        { _id: new ObjectId(bookId) },
+        { $set: { status: 'fulfillment_error', error: 'Book contains placeholder images. Printing aborted.' } }
+      );
+      return;
+    }
+
+    // 4. Trigger Gelato fulfillment ONLY for physical books
+    if (type === 'book') {
+      const { triggerGelatoFulfillment } = require('./fulfillmentService');
+
+      await triggerGelatoFulfillment({
+        bookId,
+        pdfUrl,
+        shippingAddress: orderData.shippingAddress, // Use the shipping address from orderData
+        db,
+        orderReferenceId: `${bookId}-${session.id.slice(-6)}`,
+        currency: session.currency?.toUpperCase() || 'AUD'
+      });
+
+      logger.info('📦 Gelato fulfillment initiated successfully');
+    } else {
+      logger.info('✨ [FULFILLMENT] Digital order complete. Skipping physical printing.');
+
+      // For digital orders, send PDF ready email
+      const { sendStoryEmail } = require('./mail');
+      const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+      if (book && book.userId) {
+        await sendStoryEmail(book.userId, book.title, pdfUrl);
+        logger.info('📧 PDF ready email sent for digital order');
+      }
+    }
+
+    logger.info(`✅ [LIFECYCLE_TRACKER] FINISHED full fulfillment for Book: ${bookId}`);
+
+  } catch (error) {
+    logger.error('❌ Error processing checkout completion:', error);
+
+    await db.collection('books').updateOne(
+      { _id: new ObjectId(bookId) },
+      {
+        $set: {
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          updatedAt: new Date()
+        }
+      }
+    );
+  }
+}
 
 app.post('/api/create-checkout', async (req, res) => {
   try {

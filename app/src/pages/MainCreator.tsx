@@ -356,7 +356,7 @@ export default function MainCreator() {
             <div className="grid grid-cols-1 gap-4">
               {renderSelect('Art Style', 'characterStyle', options.styles)}
               {renderSelect('Story Location', 'location', options.locations)}
-              {renderSelect('Life Lesson', 'lesson', ['Kindness', 'Courage', 'Sharing', 'Patience'])}
+              {renderSelect('Life Lesson', 'lesson', randomLessons)}
             </div>
           </div>
 
