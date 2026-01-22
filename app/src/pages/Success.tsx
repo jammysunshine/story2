@@ -14,23 +14,36 @@ export default function SuccessPage() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (bookId) {
-      interval = setInterval(async () => {
-        try {
-          const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
-          if (res.data.pdfUrl) {
-            setPdfUrl(res.data.pdfUrl);
-            clearInterval(interval);
-            setLoading(false); // Move setLoading to when we have the data
+
+    const startPolling = async () => {
+      if (bookId) {
+        interval = setInterval(async () => {
+          try {
+            const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
+            if (res.data.pdfUrl) {
+              setPdfUrl(res.data.pdfUrl);
+              clearInterval(interval);
+            }
+          } catch (e: unknown) {
+            console.error('Polling failed', e);
           }
-        } catch (e: unknown) {
-          console.error('Polling failed', e);
-        }
-      }, 10000);
-    } else {
-      setLoading(false); // Set loading to false if no bookId
-    }
-    return () => clearInterval(interval);
+        }, 10000);
+      }
+    };
+
+    startPolling();
+
+    // Set loading to false after a short delay to allow UI to render
+    const timer = setTimeout(() => {
+      if (bookId) {
+        setLoading(false);
+      }
+    }, 500);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, [bookId]);
 
   if (loading) {
