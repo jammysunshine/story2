@@ -13,16 +13,16 @@ export default function SuccessPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    let interval: number | null = null;
 
     const startPolling = async () => {
       if (bookId) {
-        interval = setInterval(async () => {
+        interval = window.setInterval(async () => {
           try {
             const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
             if (res.data.pdfUrl) {
               setPdfUrl(res.data.pdfUrl);
-              clearInterval(interval);
+              if (interval !== null) window.clearInterval(interval);
             }
           } catch (e: unknown) {
             console.error('Polling failed', e);
@@ -41,7 +41,7 @@ export default function SuccessPage() {
     }, 500);
 
     return () => {
-      clearInterval(interval);
+      if (interval !== null) window.clearInterval(interval);
       clearTimeout(timer);
     };
   }, [bookId]);
@@ -87,7 +87,7 @@ export default function SuccessPage() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Total Paid</span>
-              <span className="font-black text-lg">$25.00 AUD</span>
+              <span className="font-black text-lg">${import.meta.env.VITE_PRINT_PRICE || '25'}.00 {(import.meta.env.VITE_BASE_CURRENCY || 'aud').toUpperCase()}</span>
             </div>
             <div className="pt-6 border-t border-white/5 flex justify-between items-center">
               <span className="px-4 py-1.5 bg-green-500/10 text-green-500 rounded-full font-black text-[10px] uppercase tracking-widest ring-1 ring-green-500/20">Verified Paid</span>

@@ -18,14 +18,14 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 //console.warn('⚠️⚠️⚠️ MAIN CREATOR FILE LOADED AT:', new Date().toLocaleTimeString());
 
 const API_URL = 'http://localhost:3001/api'
-const TEASER_LIMIT = 7;
+const TEASER_LIMIT = parseInt(import.meta.env.VITE_STORY_TEASER_PAGES_COUNT || '7');
 
-// Pricing Constants (currently defined but not used in this component)
-const _STORY_COST = import.meta.env.VITE_STORY_COST || '10';
-const _IMAGE_COST = import.meta.env.VITE_IMAGE_COST || '2';
-const _PDF_COST = import.meta.env.VITE_PDF_COST || '15';
-const _BOOK_COST = import.meta.env.VITE_PRINT_PRICE || '25';
-
+// Pricing Constants for UI Display
+const STORY_COST = import.meta.env.VITE_STORY_COST || '10';
+const IMAGE_COST = import.meta.env.VITE_IMAGE_COST || '2';
+const PDF_COST = import.meta.env.VITE_PDF_COST || '9.99';
+const BOOK_COST = import.meta.env.VITE_PRINT_PRICE || '49.99';
+const BASE_CURRENCY = (import.meta.env.VITE_BASE_CURRENCY || 'usd').toUpperCase();
 
 const options = {
   genders: ['Boy', 'Girl'],
@@ -92,6 +92,7 @@ export default function MainCreator() {
     email: string;
     name: string;
     id?: string;
+    token?: string; // Added token
     createdAt?: Date;
     updatedAt?: Date;
     credits?: number;
@@ -195,6 +196,7 @@ export default function MainCreator() {
     currency: string;
     status: string;
     type: string;
+    trackingUrl?: string; // Added trackingUrl
     shippingAddress: {
       firstName: string;
       lastName: string;
@@ -247,7 +249,7 @@ export default function MainCreator() {
     });
   };
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<number | null>(null);
 
   useEffect(() => {
     console.warn('--- POLLING USEEFFECT TRIGGERED ---');
@@ -332,7 +334,6 @@ export default function MainCreator() {
       setOrdersLoading(false);
     }
   }
-  }
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -385,7 +386,11 @@ export default function MainCreator() {
 
   const startPainting = async () => {
     console.warn('🎨 FRONTEND: startPainting CALLED');
-    console.warn('Book ID:', book?.bookId);
+    if (!book || !book.bookId) {
+      console.error('❌ FRONTEND: No book ID found');
+      return;
+    }
+    console.warn('Book ID:', book.bookId);
     setLoading(true)
     try {
       const res = await axios.post(`${API_URL}/generate-images`, { bookId: book.bookId })
@@ -569,7 +574,7 @@ export default function MainCreator() {
         </div>
       )}
 
-      {step === 2 && (
+      {step === 2 && book && (
         <div className="max-w-2xl mx-auto space-y-8 animate-in zoom-in duration-500">
           <div className="text-center">
             <h2 className="text-3xl font-black uppercase text-white">{book.title}</h2>
@@ -591,7 +596,7 @@ export default function MainCreator() {
         </div>
       )}
 
-      {step === 3 && (
+      {step === 3 && book && (
         <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
           <div className="text-center">
             <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
@@ -681,7 +686,7 @@ export default function MainCreator() {
                   </>
                 ) : (
                   <>
-                    Order Hardcover (${import.meta.env.VITE_PRINT_PRICE || '25'})
+                    Order Hardcover (${BOOK_COST} {BASE_CURRENCY})
                   </>
                 )}
               </button>
@@ -696,5 +701,3 @@ export default function MainCreator() {
 function Separator() {
   return <div className="h-px bg-white/10 w-full my-6" />;
 }
-
-export default MainCreator;
