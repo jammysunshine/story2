@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2 } from 'lucide-react'
 import axios from 'axios'
-import { 
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -11,6 +11,7 @@ import {
 import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
 import { useToast } from "../hooks/use-toast"
+import { useCheckout } from "../hooks/useCheckout";
 
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 
@@ -55,6 +56,8 @@ export default function MainCreator() {
 
   console.log('MainCreator render: step', step, 'bookId', book?.bookId)
   const [user, setUser] = useState<any>(null)
+
+  const { createCheckoutSession, loading: checkoutLoading } = useCheckout();
   
   useEffect(() => {
     GoogleAuth.initialize();
@@ -174,8 +177,9 @@ export default function MainCreator() {
             const prevPaintedCount = prev.pages?.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
             
             // CRITICAL: Prevent "downgrade" regression
-            if (newPaintedCount < prevPaintedCount && prev.status === newStatus) {
-              console.warn(`⚠️ Rejecting state regression: Current=${prevPaintedCount}, API=${newPaintedCount}`);
+            // If new count is LESS than what we have, REJECT it unless status changed significantly
+            if (newPaintedCount < prevPaintedCount && newStatus !== 'preview') {
+              console.warn(`🚨 BLOCKED REGRESSION: UI has ${prevPaintedCount}, API said ${newPaintedCount}. Ignoring API.`);
               return prev;
             }
 
@@ -528,8 +532,31 @@ export default function MainCreator() {
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
             <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
             <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
-            <button className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all">
-              Order Hardcover ($25)
+            <button
+              onClick={() => {
+                if (book && book._id && book.title) {
+                  createCheckoutSession(book._id, book.title);
+                } else {
+                  toast({
+                    title: "Error",
+                    description: "Book information not available. Please try again.",
+                    variant: "destructive"
+                  });
+                }
+              }}
+              disabled={checkoutLoading}
+              className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+            >
+              {checkoutLoading ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  Order Hardcover ($25)
+                </>
+              )}
             </button>
           </div>
         </div>
