@@ -55,7 +55,19 @@ export default function MainCreator() {
     GoogleAuth.initialize();
     const savedUser = localStorage.getItem('user');
     if (savedUser) setUser(JSON.parse(savedUser));
+    const savedBook = localStorage.getItem('book');
+    if (savedBook) setBook(JSON.parse(savedBook));
+    const savedStep = localStorage.getItem('step');
+    if (savedStep) setStep(parseInt(savedStep));
   }, []);
+
+  useEffect(() => {
+    if (book) localStorage.setItem('book', JSON.stringify(book));
+  }, [book]);
+
+  useEffect(() => {
+    localStorage.setItem('step', step.toString());
+  }, [step]);
 
   const login = async () => {
     try {
