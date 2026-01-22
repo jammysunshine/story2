@@ -273,10 +273,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
         const firstSuccessBase64 = await Promise.any(runners);
         if (firstSuccessBase64) {
           await file.save(Buffer.from(firstSuccessBase64, 'base64'), { metadata: { contentType: 'image/png' } });
-          const [signedUrl] = await file.getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
+          const publicUrl = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`;
           giLog.info(`✅ [${type.toUpperCase()}_RACE] Winner found in Batch ${raceAttempt + 1}!`);
-          await db.collection('images').updateOne({ bookId: new ObjectId(bookId), type: `${type}_reference` }, { $set: { gcsUrl: `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`, updatedAt: new Date(), model: 'gemini' } }, { upsert: true });
-          return signedUrl;
+          await db.collection('images').updateOne({ bookId: new ObjectId(bookId), type: `${type}_reference` }, { $set: { gcsUrl: publicUrl, updatedAt: new Date(), model: 'gemini' } }, { upsert: true });
+          return publicUrl;
         }
       } catch (raceError) {
         giLog.warn(`⚠️ [${type.toUpperCase()}_RACE] Batch ${raceAttempt + 1} failed: ${raceError.message}`);
@@ -394,15 +394,16 @@ async function generateImages(db, bookId, isFulfillment = false) {
         const firstSuccessBase64 = await Promise.any(runners);
         if (firstSuccessBase64) {
           const fileName = `books/${bookId}/page_${page.pageNumber}.png`;
-          await bucket.file(fileName).save(Buffer.from(firstSuccessBase64, 'base64'), { metadata: { contentType: 'image/png' } });
-          const [signedUrl] = await bucket.file(fileName).getSignedUrl({ version: 'v4', action: 'read', expires: Date.now() + 60 * 60 * 1000 });
+          const publicUrl = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`;
           
-          const timestamp = Date.now();
-          updatedPages[pageIndex].imageUrl = `${signedUrl}?v=${timestamp}`;
+          await bucket.file(fileName).save(Buffer.from(firstSuccessBase64, 'base64'), { metadata: { contentType: 'image/png' } });
+          
+          // Use a simple timestamp for UI cache busting, but keep the base URL clean
+          updatedPages[pageIndex].imageUrl = `${publicUrl}?v=${Date.now()}`;
 
           await Promise.all([
             db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { [`pages.${pageIndex}`]: updatedPages[pageIndex], pdfUrl: '', updatedAt: new Date() } }),
-            db.collection('images').updateOne({ bookId: new ObjectId(bookId), pageNumber: page.pageNumber }, { $set: { gcsUrl: `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${fileName}`, updatedAt: new Date(), model: 'gemini' } }, { upsert: true })
+            db.collection('images').updateOne({ bookId: new ObjectId(bookId), pageNumber: page.pageNumber }, { $set: { gcsUrl: publicUrl, updatedAt: new Date(), model: 'gemini' } }, { upsert: true })
           ]);
           giLog.info(`✅ [Page ${page.pageNumber}] Success! (Atomic sync complete)`);
           return true;
@@ -426,6 +427,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
   giLog.info(`✅ TEASER BATCH COMPLETE.`);
 
   // Explicitly update status to teaser_ready so frontend knows to stop or show preview
+  giLog.info(`🎯 Setting status to teaser_ready for book: ${bookId}`);
   await db.collection('books').updateOne(
     { _id: new ObjectId(bookId) },
     { $set: { status: 'teaser_ready', updatedAt: new Date() } }
@@ -472,11 +474,12 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     if (pagesToProcessCount === masterPages.length && !isPaidStatus) {
       updateData.status = 'preview';
-      // If this was previously a teaser, mark it as claimed
-      if (bookRecord?.userId === null && userEmail !== 'none') {
-        updateData.userId = userEmail;
-      }
+    } else if (!isFulfillment && !isPaidStatus) {
+      // Ensure it stays teaser_ready if we just finished the teaser batch
+      updateData.status = 'teaser_ready';
     }
+
+    giLog.info(`🎯 Final DB Update Status: ${updateData.status || 'keeping current'}`);
 
     const updateResult = await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
@@ -507,7 +510,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
     }
 
     const pagesWithImages = updatedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
-    giLog.info(`📊 FINAL RESULTS: Total=${updatedPages.length}, WithImages=${pagesWithImages}`);
+    //giLog.info(`📊 FINAL RESULTS: Total=${updatedPages.length}, WithImages=${pagesWithImages}`);
   } catch (updateError) {
     giLog.error(`❌ FAILED TO UPDATE BOOK DOCUMENT`, updateError);
   }

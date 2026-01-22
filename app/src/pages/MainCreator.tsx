@@ -14,6 +14,8 @@ import { useToast } from "../hooks/use-toast"
 
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 
+//console.warn('⚠️⚠️⚠️ MAIN CREATOR FILE LOADED AT:', new Date().toLocaleTimeString());
+
 const API_URL = 'http://localhost:3001/api'
 const TEASER_LIMIT = 7;
 
@@ -139,36 +141,67 @@ export default function MainCreator() {
   };
 
   useEffect(() => {
-    console.log('Polling useEffect triggered, step:', step, 'bookId:', book?.bookId);
+    //console.log('--- POLLING USEEFFECT TRIGGERED ---');
+    console.log('Current Step:', step);
+    console.log('Book ID:', book?.bookId);
+    console.log('Book Status:', book?.status);
+    
     let interval: any;
     if (step === 3 && book?.bookId) {
-      console.log('Starting polling for bookId:', book.bookId);
+      console.log('✅ Polling condition MET. Starting loop.');
       const poll = async () => {
+        //console.log('--- POLLER TICK ---');
         console.log('Polling book status for:', book.bookId);
         try {
           const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
-          console.log('Polled book status:', res.data.status, 'Pages with images:', res.data.pages.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length);
+          console.log('📡 API Response Status:', res.data.status);
+          console.log('📡 API Response Pages:', res.data.pages?.length);
           
+          const paintedCount = res.data.pages.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
+          console.log('📡 Painted Images Count:', paintedCount);
+
           // Update book data whenever we get pages, regardless of status string
           setBook((prev: any) => {
-            if (!prev) return null;
-            console.log('Updating book pages in UI');
-            return { ...prev, status: res.data.status, pages: res.data.pages };
+            //console.log('In setBook callback...');
+            if (!prev) {
+              //console.log('No prev state found!');
+              return null;
+            }
+
+            // Check if pages have actually changed to avoid unnecessary re-renders
+            const prevImageCount = prev.pages?.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
+            
+            //console.log(`State Update Check: PrevImages=${prevImageCount}, NewImages=${paintedCount}`);
+
+            if (prevImageCount !== paintedCount || prev.status !== res.data.status) {
+              console.log('!!! UPDATING STATE WITH NEW DATA !!!');
+              return { ...prev, status: res.data.status, pages: [...res.data.pages] };
+            } else {
+              //console.log('No change detected, skipping state update.');
+              return prev;
+            }
           });
-          
+
           // Stop polling if we reached a final state
           if (['preview', 'illustrated', 'paid', 'printing', 'teaser_ready'].includes(res.data.status)) {
-            console.log('Stopping poll. Status:', res.data.status);
+            console.log('🏁 STOPPING POLL. Final Status Reached:', res.data.status);
             clearInterval(interval);
           }
-        } catch (e) {
-          console.error('Polling failed', e);
+        } catch (e: any) {
+          console.error('❌ Polling failed:', e.message);
         }
       };
       poll();
       interval = setInterval(poll, 5000);
+    } else {
+      //console.log('❌ Polling condition NOT met.');
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) {
+        //console.log('Cleaning up interval...');
+        clearInterval(interval);
+      }
+    };
   }, [step, book?.bookId]);
 
   const fetchOrders = async () => {
@@ -215,21 +248,33 @@ export default function MainCreator() {
   };
 
   const generateStory = async () => {
+    console.warn('🚀 FRONTEND: generateStory CALLED');
+    console.warn('Payload:', { ...formData, photoUrl, email: user?.email });
     setLoading(true)
     try {
       const res = await axios.post(`${API_URL}/generate-story`, { ...formData, photoUrl, email: user?.email })
+      console.warn('✅ FRONTEND: Story Generated Successfully', res.data);
       setBook(res.data)
       setStep(2)
-    } catch (err) { alert('Failed to generate story.') }
+    } catch (err: any) { 
+      console.error('❌ FRONTEND: Story Generation Failed', err.message);
+      alert('Failed to generate story.') 
+    }
     finally { setLoading(false) }
   }
 
   const startPainting = async () => {
+    console.warn('🎨 FRONTEND: startPainting CALLED');
+    console.warn('Book ID:', book?.bookId);
     setLoading(true)
     try {
-      await axios.post(`${API_URL}/generate-images`, { bookId: book.bookId })
+      const res = await axios.post(`${API_URL}/generate-images`, { bookId: book.bookId })
+      console.warn('✅ FRONTEND: Painting Started Successfully', res.data);
       setStep(3)
-    } catch (err) { alert('Failed to start painting.') }
+    } catch (err: any) { 
+      console.error('❌ FRONTEND: Painting Failed to Start', err.message);
+      alert('Failed to start painting.') 
+    }
     finally { setLoading(false) }
   }
 
@@ -434,11 +479,23 @@ export default function MainCreator() {
           
           <div className="space-y-20">
             {book.pages.map((p: any, i: number) => (
-              <div key={i} className="space-y-6">
+              <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
                 <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
                   {i < TEASER_LIMIT ? (
-                    p.imageUrl ? (
-                      <img key={p.imageUrl} src={p.imageUrl} className="w-full h-full object-cover" alt="" />
+                    p.imageUrl && !p.imageUrl.includes('placeholder') ? (
+                      <img
+                        key={p.imageUrl}
+                        src={p.imageUrl}
+                        className="w-full h-full object-cover"
+                        alt={`Page ${i+1}`}
+                        onError={(e) => {
+                          console.error(`Failed to load image: ${p.imageUrl}`);
+                          // If image fails to load, it might be an expired signed URL
+                          // We can't easily trigger a single page refresh here without complex state,
+                          // but the poller will eventually get a new one.
+                          // For now, let's just log it.
+                        }}
+                      />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
                         <Palette className="text-slate-700 w-12 h-12" />

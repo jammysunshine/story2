@@ -57,16 +57,23 @@ async function connectDB() {
 
 async function getSignedUrl(gcsPath) {
   if (!gcsPath) return null;
-  const filePath = gcsPath.replace(`https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/`, '');
+  
+  // 1. Strip any existing query parameters or versioning (e.g., ?v=123 or ?X-Goog-...)
+  let cleanPath = gcsPath.split('?')[0];
+  
+  // 2. Extract the relative file path from the full URL
+  const bucketPrefix = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/`;
+  const filePath = cleanPath.replace(bucketPrefix, '');
+  
   try {
     const [url] = await bucket.file(filePath).getSignedUrl({
       version: 'v4',
       action: 'read',
-      expires: Date.now() + 15 * 60 * 1000,
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
     });
     return url;
   } catch (e) {
-    logger.error({ msg: 'Sign error', error: e.message });
+    logger.error({ msg: 'Sign error', error: e.message, path: filePath });
     return gcsPath;
   }
 }
