@@ -1,10 +1,16 @@
 const { MongoClient, ObjectId } = require('mongodb');
-const USER_EMAIL = 'nidhi.cambridge@gmail.com'; // The user to allocate to
-const MONGODB_URI = 'mongodb+srv://jammysunshine:11wMGp1fnrwhZGIQ@cluster0.qqweu91.mongodb.net/story-db?retryWrites=true&w=majority';
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-async function allocateUnallocatedBooks() {
+const BOOK_ID = '6971e7f777734bddea0fcca8'; // The specific book ID
+const USER_EMAIL = 'nidhi.cambridge@gmail.com'; // The user to allocate to
+const MONGODB_URI = process.env.MONGODB_URI || 'REPLACE_WITH_YOUR_MONGODB_URI';
+
+
+
+async function allocateBook() {
   console.log('Starting script...');
-  const client = new MongoClient(MONGODB_URI, { family: 4, serverSelectionTimeoutMS: 60000, connectTimeoutMS: 60000 });
+  const client = new MongoClient(process.env.MONGODB_URI, { family: 4, serverSelectionTimeoutMS: 60000, connectTimeoutMS: 60000 });
   console.log('MongoClient created');
 
   try {
@@ -14,42 +20,35 @@ async function allocateUnallocatedBooks() {
     const db = client.db('story-db-v2');
     console.log('Got DB reference');
 
-    // Find all books where userId is null
-    console.log('Querying for unallocated books...');
-    const unallocatedBooks = await db.collection('books').find({ userId: null }).toArray();
-    console.log('Query completed');
+    console.log(`Allocating book ${BOOK_ID} to ${USER_EMAIL}`);
 
-    if (unallocatedBooks.length === 0) {
-      console.log('No unallocated books found.');
+    // Update the book
+    console.log(`Updating book in DB`);
+    const updateResult = await db.collection('books').updateOne(
+      { _id: new ObjectId(BOOK_ID) },
+      {
+        $set: {
+          userId: USER_EMAIL,
+          status: 'preview', // Unlock it for preview
+          isDigitalUnlocked: true,
+          updatedAt: new Date()
+        }
+      }
+    );
+    console.log(`Book update result:`, updateResult);
+
+    if (updateResult.matchedCount === 0) {
+      console.log('Book not found!');
       return;
     }
 
-    console.log(`Found ${unallocatedBooks.length} unallocated books. Allocating to ${USER_EMAIL}...`);
+    console.log('Book allocated successfully.');
 
-    for (const book of unallocatedBooks) {
-      const bookId = book._id.toString();
-      console.log(`Processing book ${bookId}`);
-
-      // Update the book
-      console.log(`Updating book ${bookId} in DB`);
-      await db.collection('books').updateOne(
-        { _id: book._id },
-        {
-          $set: {
-            userId: USER_EMAIL,
-            status: 'preview', // Unlock it for preview
-            isDigitalUnlocked: true,
-            updatedAt: new Date()
-          }
-        }
-      );
-      console.log(`Book ${bookId} updated`);
-
-      console.log(`Allocated book ${bookId}: ${book.title}`);
-
-      // Sync to user's recentBooks
+    // Sync to user's recentBooks
+    const book = await db.collection('books').findOne({ _id: new ObjectId(BOOK_ID) });
+    if (book) {
       const recentBookEntry = {
-        id: bookId,
+        id: BOOK_ID,
         title: book.title,
         thumbnailUrl: book.pages[0]?.imageUrl || '',
         status: 'preview',
@@ -72,10 +71,9 @@ async function allocateUnallocatedBooks() {
         },
         { upsert: true }
       );
-      console.log(`Synced book ${bookId} to user`);
-    }
 
-    console.log('All unallocated books allocated successfully.');
+      console.log('Synced to user\'s recent books.');
+    }
 
   } catch (error) {
     console.error('Error:', error);
@@ -84,4 +82,4 @@ async function allocateUnallocatedBooks() {
   }
 }
 
-allocateUnallocatedBooks();
+allocateBook();

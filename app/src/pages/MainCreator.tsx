@@ -49,6 +49,8 @@ export default function MainCreator() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [book, setBook] = useState<any>(null)
+
+  console.log('MainCreator render: step', step, 'bookId', book?.bookId)
   const [user, setUser] = useState<any>(null)
   
   useEffect(() => {
@@ -59,14 +61,17 @@ export default function MainCreator() {
     if (savedBook) setBook(JSON.parse(savedBook));
     const savedStep = localStorage.getItem('step');
     if (savedStep) setStep(parseInt(savedStep));
+    console.log('Loaded from localStorage: book', !!savedBook, 'step', savedStep);
   }, []);
 
   useEffect(() => {
     if (book) localStorage.setItem('book', JSON.stringify(book));
+    console.log('Saved book to localStorage');
   }, [book]);
 
   useEffect(() => {
     localStorage.setItem('step', step.toString());
+    console.log('Saved step to localStorage:', step);
   }, [step]);
 
   const login = async () => {
@@ -134,15 +139,19 @@ export default function MainCreator() {
   };
 
   useEffect(() => {
+    console.log('Polling useEffect triggered, step:', step, 'bookId:', book?.bookId);
     let interval: any;
     if (step === 3 && book?.bookId) {
+      console.log('Starting polling for bookId:', book.bookId);
       const poll = async () => {
+        console.log('Polling book status for:', book.bookId);
         try {
           const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
           console.log('Polled book status:', res.data.status, 'Pages with images:', res.data.pages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length);
           if (res.data.status === 'teaser' || res.data.status === 'illustrated') {
             console.log('Updating book pages in UI');
-            setBook({ ...book, pages: res.data.pages });
+            setBook({ ...book, pages: [...res.data.pages] });
+            console.log('Book updated, new pages length:', res.data.pages.length);
             if (res.data.status === 'illustrated') clearInterval(interval);
           }
         } catch (e) {
@@ -422,7 +431,7 @@ export default function MainCreator() {
                 <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
                   {i < TEASER_LIMIT ? (
                     p.imageUrl ? (
-                      <img src={p.imageUrl} className="w-full h-full object-cover" alt="" />
+                      <img key={p.imageUrl} src={p.imageUrl} className="w-full h-full object-cover" alt="" />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
                         <Palette className="text-slate-700 w-12 h-12" />
