@@ -160,9 +160,9 @@ export default function MainCreator() {
         toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
         return userData; // Return for chaining
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Login failed', err);
-      toast({ title: "Login Failed", description: "Could not sign in with Google", variant: "destructive" });
+      toast({ title: "Login Failed", description: err.message || "Could not sign in with Google", variant: "destructive" });
     }
     return null;
   };
@@ -316,8 +316,8 @@ export default function MainCreator() {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       setOrders(res.data.orders);
-    } catch (err) {
-      console.error('Failed to fetch orders');
+    } catch (err: any) {
+      console.error('Failed to fetch orders', err);
     } finally {
       setOrdersLoading(false);
     }
