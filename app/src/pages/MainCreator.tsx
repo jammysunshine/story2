@@ -20,6 +20,12 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 const API_URL = 'http://localhost:3001/api'
 const TEASER_LIMIT = 7;
 
+// Pricing Constants
+const STORY_COST = import.meta.env.VITE_STORY_COST || '10';
+const IMAGE_COST = import.meta.env.VITE_IMAGE_COST || '2';
+const PDF_COST = import.meta.env.VITE_PDF_COST || '15';
+const BOOK_COST = import.meta.env.VITE_PRINT_PRICE || '25';
+
 const options = {
   genders: ['Boy', 'Girl'],
   skinTones: ['Fair', 'Light', 'Medium', 'Tan', 'Deep'],
@@ -96,8 +102,22 @@ export default function MainCreator() {
 
   const [user, setUser] = useState<User | null>(null)
 
+  interface FormData {
+    childName: string;
+    age: string;
+    gender: string;
+    skinTone: string;
+    hairStyle: string;
+    hairColor: string;
+    animal: string;
+    characterStyle: string;
+    location: string;
+    lesson: string;
+    occasion: string;
+  }
+
   const { createCheckoutSession, loading: checkoutLoading } = useCheckout();
-  
+
   useEffect(() => {
     GoogleAuth.initialize();
     const savedUser = localStorage.getItem('user');
@@ -158,10 +178,33 @@ export default function MainCreator() {
   const [photoUrl, setPhotoUrl] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [orders, setOrders] = useState<any[]>([])
+  interface Order {
+    _id: string;
+    bookId: string;
+    userId: string;
+    amount: number;
+    currency: string;
+    status: string;
+    type: string;
+    shippingAddress: {
+      firstName: string;
+      lastName: string;
+      addressLine1: string;
+      addressLine2: string;
+      city: string;
+      state: string;
+      postCode: string;
+      country: string;
+      email: string;
+    };
+    createdAt: Date;
+    updatedAt: Date;
+  }
+
+  const [orders, setOrders] = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
   
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     childName: 'Emma',
     age: '5',
     gender: 'Girl',
@@ -217,12 +260,12 @@ export default function MainCreator() {
           const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
           const newStatus = res.data.status;
           const newPages = res.data.pages || [];
-          const newPaintedCount = newPages.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
+          const newPaintedCount = newPages.filter((p: BookPage) => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
 
-          setBook((prev: any) => {
+          setBook((prev: Book | null) => {
             if (!prev) return null;
 
-            const prevPaintedCount = prev.pages?.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
+            const prevPaintedCount = prev.pages?.filter((p: BookPage) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
             
             // CRITICAL: Prevent "downgrade" regression
             // If new count is LESS than what we have, REJECT it unless status changed significantly
@@ -520,7 +563,7 @@ export default function MainCreator() {
             <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2">Draft Preview</p>
           </div>
           <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 max-h-[50vh] overflow-y-auto space-y-8 shadow-inner custom-scrollbar">
-            {book.pages.map((p: any) => (
+            {book.pages?.map((p: BookPage) => (
               <div key={p.pageNumber} className="relative pl-8">
                 <span className="absolute left-0 top-0 text-[10px] font-black text-primary opacity-50">{p.pageNumber}</span>
                 <p className="text-xl text-slate-200 italic leading-relaxed">"{p.text}"</p>
@@ -543,7 +586,7 @@ export default function MainCreator() {
           </div>
           
           <div className="space-y-20">
-            {book.pages.map((p: any, i: number) => (
+            {book.pages?.map((p: BookPage, i: number) => (
               <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
                 <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
                   {i < TEASER_LIMIT ? (
@@ -625,7 +668,7 @@ export default function MainCreator() {
                   </>
                 ) : (
                   <>
-                    Order Hardcover ($25)
+                    Order Hardcover (${import.meta.env.VITE_PRINT_PRICE || '25'})
                   </>
                 )}
               </button>

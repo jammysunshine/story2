@@ -66,6 +66,11 @@ const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
 
+const STORY_COST = parseInt(process.env.STORY_COST || '10');
+const IMAGE_COST = parseInt(process.env.IMAGE_COST || '2');
+const PDF_COST = parseInt(process.env.PDF_COST || '15');
+const BOOK_COST = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
+
 // Initialize Services
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -683,7 +688,7 @@ app.post('/api/create-checkout', async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       shipping_address_collection: { allowed_countries: ['AU', 'US', 'CA', 'GB'] },
-      line_items: [{ price_data: { currency: 'aud', product_data: { name: `Hardcover: ${bookTitle}` }, unit_amount: 2500 }, quantity: 1 }],
+      line_items: [{ price_data: { currency: BASE_CURRENCY, product_data: { name: `Hardcover: ${bookTitle}` }, unit_amount: PRINT_PRICE_AMOUNT }, quantity: 1 }],
       mode: 'payment',
       success_url: `${process.env.APP_URL}/success?bookId=${bookId}`,
       cancel_url: `${process.env.APP_URL}/`,
