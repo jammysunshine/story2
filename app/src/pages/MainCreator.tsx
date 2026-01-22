@@ -51,6 +51,7 @@ export default function MainCreator() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [book, setBook] = useState<any>(null)
+  const isHydrated = useRef(false);
 
   console.log('MainCreator render: step', step, 'bookId', book?.bookId)
   const [user, setUser] = useState<any>(null)
@@ -62,18 +63,21 @@ export default function MainCreator() {
     const savedBook = localStorage.getItem('book');
     if (savedBook) setBook(JSON.parse(savedBook));
     const savedStep = localStorage.getItem('step');
-    if (savedStep) setStep(parseInt(savedStep));
-    console.log('Loaded from localStorage: book', !!savedBook, 'step', savedStep);
+    if (savedStep) setStep(parseInt(savedStep || '1'));
+    
+    // Mark as hydrated so we can start saving
+    isHydrated.current = true;
+    console.warn('💎 Hydration Complete: state restored from memory');
   }, []);
 
   useEffect(() => {
+    if (!isHydrated.current) return;
     if (book) localStorage.setItem('book', JSON.stringify(book));
-    console.log('Saved book to localStorage');
   }, [book]);
 
   useEffect(() => {
+    if (!isHydrated.current) return;
     localStorage.setItem('step', step.toString());
-    console.log('Saved step to localStorage:', step);
   }, [step]);
 
   const login = async () => {
@@ -140,66 +144,71 @@ export default function MainCreator() {
     });
   };
 
+  const pollingRef = useRef<any>(null);
+
   useEffect(() => {
-    //console.log('--- POLLING USEEFFECT TRIGGERED ---');
-    console.log('Current Step:', step);
-    console.log('Book ID:', book?.bookId);
-    console.log('Book Status:', book?.status);
+    console.warn('--- POLLING USEEFFECT TRIGGERED ---');
+    console.warn('Current Step:', step, 'Book ID:', book?.bookId);
     
-    let interval: any;
+    // Cleanup any existing interval before starting a new one
+    if (pollingRef.current) {
+      console.warn('🧹 Cleaning up old zombie poller');
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+
     if (step === 3 && book?.bookId) {
-      console.log('✅ Polling condition MET. Starting loop.');
+      console.warn('✅ Polling condition MET. Starting loop.');
+      
       const poll = async () => {
-        //console.log('--- POLLER TICK ---');
-        console.log('Polling book status for:', book.bookId);
+        console.log('--- POLLER TICK ---');
         try {
           const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
-          console.log('📡 API Response Status:', res.data.status);
-          console.log('📡 API Response Pages:', res.data.pages?.length);
-          
-          const paintedCount = res.data.pages.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
-          console.log('📡 Painted Images Count:', paintedCount);
+          const newStatus = res.data.status;
+          const newPages = res.data.pages || [];
+          const newPaintedCount = newPages.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
 
-          // Update book data whenever we get pages, regardless of status string
           setBook((prev: any) => {
-            //console.log('In setBook callback...');
-            if (!prev) {
-              //console.log('No prev state found!');
-              return null;
-            }
+            if (!prev) return null;
 
-            // Check if pages have actually changed to avoid unnecessary re-renders
-            const prevImageCount = prev.pages?.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
+            const prevPaintedCount = prev.pages?.filter((p: any) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
             
-            //console.log(`State Update Check: PrevImages=${prevImageCount}, NewImages=${paintedCount}`);
-
-            if (prevImageCount !== paintedCount || prev.status !== res.data.status) {
-              console.log('!!! UPDATING STATE WITH NEW DATA !!!');
-              return { ...prev, status: res.data.status, pages: [...res.data.pages] };
-            } else {
-              //console.log('No change detected, skipping state update.');
+            // CRITICAL: Prevent "downgrade" regression
+            if (newPaintedCount < prevPaintedCount && prev.status === newStatus) {
+              console.warn(`⚠️ Rejecting state regression: Current=${prevPaintedCount}, API=${newPaintedCount}`);
               return prev;
             }
+
+            if (prevPaintedCount !== newPaintedCount || prev.status !== newStatus) {
+              console.warn(`✨ Updating UI: ${prevPaintedCount} -> ${newPaintedCount} images. Status: ${newStatus}`);
+              return { ...prev, status: newStatus, pages: [...newPages] };
+            }
+            
+            return prev;
           });
 
           // Stop polling if we reached a final state
-          if (['preview', 'illustrated', 'paid', 'printing', 'teaser_ready'].includes(res.data.status)) {
-            console.log('🏁 STOPPING POLL. Final Status Reached:', res.data.status);
-            clearInterval(interval);
+          if (['preview', 'illustrated', 'paid', 'printing', 'teaser_ready'].includes(newStatus)) {
+            console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
+            if (pollingRef.current) {
+              clearInterval(pollingRef.current);
+              pollingRef.current = null;
+            }
           }
         } catch (e: any) {
           console.error('❌ Polling failed:', e.message);
         }
       };
+
       poll();
-      interval = setInterval(poll, 5000);
-    } else {
-      //console.log('❌ Polling condition NOT met.');
+      pollingRef.current = setInterval(poll, 4000);
     }
+
     return () => {
-      if (interval) {
-        //console.log('Cleaning up interval...');
-        clearInterval(interval);
+      if (pollingRef.current) {
+        console.warn('🧹 Component Cleanup: Clearing poller');
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
     };
   }, [step, book?.bookId]);

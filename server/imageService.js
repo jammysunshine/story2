@@ -467,19 +467,24 @@ async function generateImages(db, bookId, isFulfillment = false) {
     giLog.debug(`📝 [DEBUG] Final Update Size: ${docSize} characters (~${Math.round(docSize / 1024)} KB)`);
     giLog.debug(`📝 [DEBUG] Update keys: ${Object.keys(updateData).join(', ')}`);
 
-    // ONLY move to preview if we have processed all pages AND we aren't already in a 'paid' or 'fulfillment' state
-    const currentStatus = bookRecord?.status;
+    // RE-FETCH the latest status to avoid overwriting a status update that happened during processing
+    const latestRecord = await db.collection('books').findOne({ _id: new ObjectId(bookId) }, { projection: { status: 1 } });
+    const currentStatus = latestRecord?.status || bookRecord?.status;
+    
     const isPaidStatus = ['paid', 'printing', 'shipped', 'printing_test'].includes(currentStatus || '');
     const pagesToProcessCount = isFulfillment ? masterPages.length : teaserLimit;
 
     if (pagesToProcessCount === masterPages.length && !isPaidStatus) {
       updateData.status = 'preview';
-    } else if (!isFulfillment && !isPaidStatus) {
-      // Ensure it stays teaser_ready if we just finished the teaser batch
+    } else if (!isFulfillment && !isPaidStatus && currentStatus !== 'teaser_ready') {
+      // Only set teaser_ready if we aren't already in a more advanced state
       updateData.status = 'teaser_ready';
+    } else {
+      // Keep whatever the latest status was
+      updateData.status = currentStatus;
     }
 
-    giLog.info(`🎯 Final DB Update Status: ${updateData.status || 'keeping current'}`);
+    giLog.info(`🎯 Final DB Update Status: ${updateData.status}`);
 
     const updateResult = await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
