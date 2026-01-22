@@ -425,6 +425,12 @@ async function generateImages(db, bookId, isFulfillment = false) {
   await Promise.all(teaserIndices.map(idx => paintPageWithRetry(idx)));
   giLog.info(`✅ TEASER BATCH COMPLETE.`);
 
+  // Explicitly update status to teaser_ready so frontend knows to stop or show preview
+  await db.collection('books').updateOne(
+    { _id: new ObjectId(bookId) },
+    { $set: { status: 'teaser_ready', updatedAt: new Date() } }
+  );
+
   if (isFulfillment) {
     const regularIndices = masterPages.map((_, i) => i).filter(idx => idx >= teaserLimit);
     const BATCH_DELAY_MS = STORY_BATCH_DELAY_MS;
