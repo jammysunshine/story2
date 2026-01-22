@@ -135,7 +135,7 @@ async function generatePdf(db, bookId) {
     await page.setViewport({ width: 2400, height: 3300, deviceScaleFactor: 1 });
 
     const mergedPdf = await PDFDocument.create();
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.APP_URL || 'http://localhost:5173';
     const storyPageCount = book.pages.length;
     const totalActualPages = storyPageCount + 1; // +1 for Title Page
     const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');

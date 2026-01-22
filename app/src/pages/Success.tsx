@@ -15,6 +15,7 @@ export default function SuccessPage() {
   useEffect(() => {
     let interval: any;
     if (bookId) {
+      setLoading(false); // Set loading to false immediately after setting up the interval
       interval = setInterval(async () => {
         try {
           const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
@@ -22,11 +23,10 @@ export default function SuccessPage() {
             setPdfUrl(res.data.pdfUrl);
             clearInterval(interval);
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error('Polling failed', e);
         }
       }, 10000);
-      setLoading(false);
     }
     return () => clearInterval(interval);
   }, [bookId]);

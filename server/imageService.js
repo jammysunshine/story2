@@ -511,9 +511,9 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     // SMART PDF TRIGGER
     if (pagesToProcessCount === masterPages.length && !isFulfillment) {
-      const baseUrl = process.env.APP_URL || 'http://localhost:3001';
+      const internalUrl = `http://localhost:${process.env.PORT || 3001}`;
       giLog.info(`🚀 Triggering background PDF generation for book: ${bookId}`);
-      axios.post(`${baseUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed:', e.message));
+      axios.post(`${internalUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed:', e.message));
     }
 
     const pagesWithImages = updatedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;

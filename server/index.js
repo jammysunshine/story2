@@ -594,7 +594,8 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     // 2. Trigger PDF generation (Now safe because images are done)
     logger.info(`📄 Triggering PDF generation for: ${bookId}`);
 
-    const pdfResponse = await fetch(`${process.env.APP_URL || 'http://localhost:3001'}/api/generate-pdf`, {
+    const internalUrl = `http://localhost:${process.env.PORT || 3001}`;
+    const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
