@@ -298,8 +298,9 @@ export default function MainCreator() {
               pollingRef.current = null;
             }
           }
-        } catch (e: any) {
-          console.error('❌ Polling failed:', e.message);
+        } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';
+          console.error('❌ Polling failed:', errorMessage);
         }
       };
 
@@ -324,11 +325,12 @@ export default function MainCreator() {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       setOrders(res.data.orders);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch orders', err);
     } finally {
       setOrdersLoading(false);
     }
+  }
   }
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -372,9 +374,10 @@ export default function MainCreator() {
       const bookData = { ...res.data, bookId: res.data.bookId || res.data._id || res.data.id };
       setBook(bookData)
       setStep(2)
-    } catch (err: any) { 
-      console.error('❌ FRONTEND: Story Generation Failed', err.message);
-      alert('Failed to generate story.') 
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error('❌ FRONTEND: Story Generation Failed', errorMessage);
+      alert(`Failed to generate story: ${errorMessage}`)
     }
     finally { setLoading(false) }
   }
@@ -387,9 +390,10 @@ export default function MainCreator() {
       const res = await axios.post(`${API_URL}/generate-images`, { bookId: book.bookId })
       console.warn('✅ FRONTEND: Painting Started Successfully', res.data);
       setStep(3)
-    } catch (err: any) { 
-      console.error('❌ FRONTEND: Painting Failed to Start', err.message);
-      alert('Failed to start painting.') 
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      console.error('❌ FRONTEND: Painting Failed to Start', errorMessage);
+      alert(`Failed to start painting: ${errorMessage}`)
     }
     finally { setLoading(false) }
   }

@@ -97,7 +97,8 @@ async function triggerGelatoFulfillment(
       postCode: shippingAddress.postCode || '0000',
       state: normalizedState || '',
       country: shippingAddress.country || 'AU',
-      email: shippingAddress.email
+      email: shippingAddress.email,
+      phone: shippingAddress.phone || ''
     }
   };
 

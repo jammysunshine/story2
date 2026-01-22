@@ -490,6 +490,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
     // 1. Create Order Record
     const shipping = session.shipping_details;
     const address = shipping?.address || session.customer_details?.address;
+    const customerPhone = session.customer_details?.phone || shipping?.phone || '';
     const nameParts = (shipping?.name || session.customer_details?.name || 'Customer').split(' ');
 
     const orderData = {
@@ -510,12 +511,25 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
         postCode: address?.postal_code || '',
         country: address?.country || 'AU',
         email: email,
+        phone: customerPhone
       },
       createdAt: new Date(),
       updatedAt: new Date()
     };
 
     await db.collection('orders').insertOne(orderData);
+
+    // 1.1 Sync latest address/phone to User Profile for future convenience
+    await db.collection('users').updateOne(
+      { email: email.toLowerCase() },
+      { 
+        $set: { 
+          lastShippingAddress: orderData.shippingAddress,
+          phone: customerPhone,
+          updatedAt: new Date() 
+        } 
+      }
+    ).catch(e => logger.error('Failed to sync address to user profile:', e));
 
     // 2. Update Book Status
     const bookUpdate = {
@@ -688,7 +702,8 @@ app.post('/api/create-checkout', async (req, res) => {
     const { bookId, bookTitle } = req.body;
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      shipping_address_collection: { allowed_countries: ['AU', 'US', 'CA', 'GB'] },
+      phone_number_collection: { enabled: true },
+      shipping_address_collection: { allowed_countries: [] }, // Blank array allows all countries supported by Stripe
       line_items: [{ price_data: { currency: BASE_CURRENCY, product_data: { name: `Hardcover: ${bookTitle}` }, unit_amount: PRINT_PRICE_AMOUNT }, quantity: 1 }],
       mode: 'payment',
       success_url: `${process.env.APP_URL}/success?bookId=${bookId}`,
