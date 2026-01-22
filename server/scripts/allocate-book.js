@@ -29,58 +29,30 @@ async function allocateUnallocatedBooks() {
       return;
     }
 
-    // Process one by one
-    const cursor = db.collection('books').find({ userId: null });
-    let processed = 0;
-    while (await cursor.hasNext()) {
-      const book = await cursor.next();
-      processed++;
+    // Get all unallocated books
+    const unallocatedBooks = await db.collection('books').find({ userId: null }).toArray();
+    console.log(`Loaded ${unallocatedBooks.length} books into memory`);
+
+    // Process sequentially
+    for (let i = 0; i < unallocatedBooks.length; i++) {
+      const book = unallocatedBooks[i];
       const bookId = book._id.toString();
-      console.log(`Processing book ${processed}/${totalCount}: ${bookId}`);
+      console.log(`Processing book ${i + 1}/${unallocatedBooks.length}: ${bookId} - ${book.title}`);
 
       // Update the book
-      console.log(`Updating book ${bookId} in DB`);
       await db.collection('books').updateOne(
         { _id: book._id },
         {
           $set: {
             userId: USER_EMAIL,
-            status: 'preview', // Unlock it for preview
+            status: 'preview',
             isDigitalUnlocked: true,
             updatedAt: new Date()
           }
         }
       );
-      console.log(`Book ${bookId} updated`);
 
-      console.log(`Allocated book ${bookId}: ${book.title}`);
-
-      // Sync to user's recentBooks
-      const recentBookEntry = {
-        id: bookId,
-        title: book.title,
-        thumbnailUrl: book.pages[0]?.imageUrl || '',
-        status: 'preview',
-        isDigitalUnlocked: true,
-        createdAt: book.createdAt
-      };
-
-      console.log(`Syncing to user recentBooks`);
-      await db.collection('users').updateOne(
-        { email: USER_EMAIL },
-        {
-          $set: { updatedAt: new Date() },
-          $push: {
-            recentBooks: {
-              $each: [recentBookEntry],
-              $position: 0,
-              $slice: 2 // Keep only last 2
-            }
-          }
-        },
-        { upsert: true }
-      );
-      console.log(`Synced book ${bookId} to user`);
+      console.log(`Allocated book ${bookId}`);
     }
 
     console.log('All unallocated books allocated successfully.');
