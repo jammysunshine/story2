@@ -571,6 +571,7 @@ export default function MainCreator() {
             {loading ? <Loader2 className="animate-spin" /> : <Wand2 />}
             Write My Story
           </button>
+          <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Premium Story Generation Value: ${STORY_COST} {BASE_CURRENCY}</p>
         </div>
       )}
 
@@ -592,6 +593,7 @@ export default function MainCreator() {
             {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
             Approve & Illustrate
           </button>
+          <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Full Book Illustration Value: ${parseInt(IMAGE_COST) * 23} {BASE_CURRENCY}</p>
           <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-400 transition-colors">Edit Hero Details</button>
         </div>
       )}
@@ -648,13 +650,16 @@ export default function MainCreator() {
             
             <div className="flex flex-col gap-4">
               {book.pdfUrl && (
-                <button
-                  onClick={() => window.open(book.pdfUrl, '_blank')}
-                  className="w-full h-14 bg-slate-800 text-white rounded-xl font-bold text-lg border border-white/10 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                >
-                  <ExternalLink size={20} />
-                  View Digital PDF
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => window.open(book.pdfUrl, '_blank')}
+                    className="w-full h-14 bg-slate-800 text-white rounded-xl font-bold text-lg border border-white/10 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <ExternalLink size={20} />
+                    View Digital PDF
+                  </button>
+                  <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">Digital PDF Edition: ${PDF_COST} {BASE_CURRENCY}</p>
+                </div>
               )}
 
               <button
