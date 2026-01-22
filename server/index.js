@@ -18,6 +18,16 @@ const logger = require('./logger');
 dotenv.config();
 
 const app = express();
+
+// --- GLOBAL SAFETY NETS ---
+process.on('uncaughtException', (err) => {
+  logger.error('🔥 CRITICAL: Uncaught Exception!', { message: err.message, stack: err.stack });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('🔥 CRITICAL: Unhandled Rejection!', { reason: reason?.message || reason, stack: reason?.stack });
+});
+
 const upload = multer({ storage: multer.memoryStorage() });
 app.use((req, res, next) => {
   if (req.originalUrl === '/api/webhook') next();
@@ -336,7 +346,13 @@ app.post('/api/generate-story', async (req, res) => {
 app.post('/api/generate-images', async (req, res) => {
   const { bookId } = req.body;
   res.json({ success: true, message: 'Painting started' });
-  generateImages(db, bookId).catch(err => logger.error('Image gen failed:', err.message));
+  generateImages(db, bookId).catch(err => {
+    logger.error('💥 [IMAGE_GEN_CRASH]', { 
+      message: err.message, 
+      stack: err.stack,
+      bookId 
+    });
+  });
 });
 
 app.get('/api/orders', async (req, res) => {

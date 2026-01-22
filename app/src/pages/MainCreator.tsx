@@ -12,6 +12,8 @@ import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
 import { useToast } from "../hooks/use-toast"
 
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
+
 const API_URL = 'http://localhost:3001/api'
 const TEASER_LIMIT = 7;
 
@@ -36,7 +38,38 @@ export default function MainCreator() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [book, setBook] = useState<any>(null)
-  const [user] = useState<any>(null)
+  const [user, setUser] = useState<any>(null)
+  
+  useEffect(() => {
+    GoogleAuth.initialize();
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) setUser(JSON.parse(savedUser));
+  }, []);
+
+  const login = async () => {
+    try {
+      const googleUser = await GoogleAuth.signIn();
+      const res = await axios.post(`${API_URL}/auth/social`, {
+        token: googleUser.authentication.idToken,
+        provider: 'google'
+      });
+      if (res.data.success) {
+        setUser(res.data.user);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
+      }
+    } catch (err) {
+      console.error('Login failed', err);
+      toast({ title: "Login Failed", description: "Could not sign in with Google", variant: "destructive" });
+    }
+  };
+
+  const logout = async () => {
+    await GoogleAuth.signOut();
+    setUser(null);
+    localStorage.removeItem('user');
+  };
+
   const [photoUrl, setPhotoUrl] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -221,7 +254,14 @@ export default function MainCreator() {
               </SheetContent>
             </Sheet>
           )}
-          {user && <div className="bg-slate-800 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-white/10">{user.name.split(' ')[0]}</div>}
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-800 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-white/10">{user.name.split(' ')[0]}</div>
+              <button onClick={logout} className="text-[10px] font-black text-slate-500 uppercase hover:text-red-400 transition-colors">Logout</button>
+            </div>
+          ) : (
+            <button onClick={login} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all">Login</button>
+          )}
         </div>
       </header>
 

@@ -149,54 +149,53 @@ async function callGeminiImageGen(params) {
 
 async function generateImages(db, bookId, isFulfillment = false) {
   dotenv.config({ override: true });
-  
   const pid = process.pid;
-  const bookRecord = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+  const userEmail = 'unknown'; // placeholder until record loaded
+  let giLog = { info: logger.info, error: logger.error }; // fallback
 
-  if (!bookRecord) {
-    logger.error(`🎯 Book not found: ${bookId}`);
-    throw new Error('Book not found in database');
-  }
+  try {
+    const bookRecord = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+    if (!bookRecord) throw new Error('Book not found in database');
 
-  const userEmail = bookRecord.email?.toLowerCase() || 'none';
-  const giLog = {
-    info: (msg, meta) => logger.info(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-    debug: (msg, meta) => logger.debug(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-    warn: (msg, meta) => logger.warn(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-    error: (msg, meta) => logger.error(`[PID:${pid}][GI][${bookId}][${userEmail}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-  };
+    const email = bookRecord.email?.toLowerCase() || 'none';
+    giLog = {
+      info: (msg, meta) => logger.info(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+      debug: (msg, meta) => logger.debug(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+      warn: (msg, meta) => logger.warn(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+      error: (msg, meta) => logger.error(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+    };
 
-  const activeHeroBible = bookRecord.heroBible || '';
-  const activeAnimalBible = bookRecord.animalBible || '';
+    giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
 
-  const rawPages = bookRecord.pages;
-  const storyPagesCount = parseInt(process.env.STORY_PAGES_COUNT || '23');
-  const storyPagesOnly = rawPages
-    .filter((p) => !p.type || p.type === 'story')
-    .slice(0, storyPagesCount)
-    .map((p) => ({ ...p, type: 'story' }));
-  const pages = storyPagesOnly;
+    const activeHeroBible = bookRecord.heroBible || '';
+    const activeAnimalBible = bookRecord.animalBible || '';
 
-  giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
-  giLog.info(`🎯 Params: { pagesCount: ${pages.length}, isFulfillment: ${isFulfillment} }`);
-  giLog.info(`🎯 Auth Status: { authenticated: ${userEmail !== 'none'}, user: "${userEmail}" }`);
+    const rawPages = bookRecord.pages || [];
+    const storyPagesCount = parseInt(process.env.STORY_PAGES_COUNT || '23');
+    const pages = rawPages
+      .filter((p) => !p.type || p.type === 'story')
+      .slice(0, storyPagesCount)
+      .map((p) => ({ ...p, type: 'story' }));
 
-  giLog.info(`🎯 Function execution continuing, book found`);
-  giLog.info(`🎯 DB Record Status: { status: "${bookRecord.status}", currentPages: ${bookRecord.pages?.length}, isDigitalUnlocked: ${bookRecord.isDigitalUnlocked} }`);
+    giLog.info(`🎯 Params: { pagesCount: ${pages.length}, isFulfillment: ${isFulfillment} }`);
+    giLog.info(`🎯 Auth Status: { authenticated: ${email !== 'none'}, user: "${email}" }`);
 
-  giLog.info(`📄 Number of Story Pages to Process: ${pages.length}`);
-  if (pages.length < 5) {
-    giLog.warn(`⚠️ Low page count detected (${pages.length}). This book might have been truncated by a previous bug.`);
-  }
+    giLog.info(`🎯 Function execution continuing, book found`);
+    giLog.info(`🎯 DB Record Status: { status: "${bookRecord.status}", currentPages: ${bookRecord.pages?.length}, isDigitalUnlocked: ${bookRecord.isDigitalUnlocked} }`);
 
-  pages.forEach((page, index) => {
-    giLog.info(`📄 Page ${index + 1} Pre-processing:`, {
-      pageNumber: page.pageNumber,
-      textLength: page.text?.length || 0,
-      hasImageUrl: !!page.imageUrl,
-      imageUrl: page.imageUrl
+    giLog.info(`📄 Number of Story Pages to Process: ${pages.length}`);
+    if (pages.length < 5) {
+      giLog.warn(`⚠️ Low page count detected (${pages.length}). This book might have been truncated by a previous bug.`);
+    }
+
+    pages.forEach((page, index) => {
+      giLog.info(`📄 Page ${index + 1} Pre-processing:`, {
+        pageNumber: page.pageNumber,
+        textLength: page.text?.length || 0,
+        hasImageUrl: !!page.imageUrl,
+        imageUrl: page.imageUrl
+      });
     });
-  });
 
   const projectId = process.env.GCP_PROJECT_ID;
   const rawKeyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -317,7 +316,17 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
   giLog.info(`📊 Master array constructed: ${masterPages.length} pages total`);
   giLog.info('💾 Initializing DB with master array structure...');
-  await db.collection('books').updateOne({ _id: new ObjectId(bookId) }, { $set: { pages: masterPages, updatedAt: new Date() } });
+  
+  try {
+    const updateResult = await db.collection('books').updateOne(
+      { _id: new ObjectId(bookId) }, 
+      { $set: { pages: masterPages, updatedAt: new Date() } }
+    );
+    giLog.info(`🎯 [GenerateImages][PID:${pid}] Initial DB Sync Result: { matched: ${updateResult.matchedCount}, modified: ${updateResult.modifiedCount} }`);
+  } catch (dbErr) {
+    giLog.error(`❌ FAILED INITIAL DB SYNC: ${dbErr.message}`, { stack: dbErr.stack });
+    throw dbErr;
+  }
 
   const updatedPages = [...masterPages];
   const getGcsUriFromUrlLocal = (urlStr) => {
@@ -444,6 +453,11 @@ async function generateImages(db, bookId, isFulfillment = false) {
       updatedAt: new Date()
     };
 
+    // Diagnostic Log for Document Size
+    const docSize = JSON.stringify(updateData).length;
+    giLog.debug(`📝 [DEBUG] Final Update Size: ${docSize} characters (~${Math.round(docSize / 1024)} KB)`);
+    giLog.debug(`📝 [DEBUG] Update keys: ${Object.keys(updateData).join(', ')}`);
+
     // ONLY move to preview if we have processed all pages AND we aren't already in a 'paid' or 'fulfillment' state
     const currentStatus = bookRecord?.status;
     const isPaidStatus = ['paid', 'printing', 'shipped', 'printing_test'].includes(currentStatus || '');
@@ -491,8 +505,12 @@ async function generateImages(db, bookId, isFulfillment = false) {
     giLog.error(`❌ FAILED TO UPDATE BOOK DOCUMENT`, updateError);
   }
 
-  giLog.info(`🎯 [LIFECYCLE_TRACKER] PAINTING_COMPLETE: Processing finished for Book: ${bookId}`);
-  giLog.info(`🎯 [GenerateImages][PID:${pid}] Execution complete.`);
+    giLog.info(`🎯 [LIFECYCLE_TRACKER] PAINTING_COMPLETE: Processing finished for Book: ${bookId}`);
+    giLog.info(`🎯 [GenerateImages][PID:${pid}] Execution complete.`);
+  } catch (err) {
+    giLog.error(`💥 [FATAL_ENGINE_ERROR] ${err.message}`, { stack: err.stack });
+    throw err;
+  }
 }
 
 module.exports = { generateImages };
