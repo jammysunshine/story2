@@ -386,6 +386,15 @@ app.post('/api/generate-pdf', async (req, res) => {
   try {
     const pdfUrl = await generatePdf(db, bookId);
     const signedUrl = await get7DaySignedUrl(pdfUrl);
+
+    // Send PDF ready email to the user
+    const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+    if (book && book.userId) {
+      const { sendStoryEmail } = require('./mail');
+      await sendStoryEmail(book.userId, book.title, signedUrl);
+      logger.info(`📧 PDF ready email sent to ${book.userId}`);
+    }
+
     res.json({ success: true, pdfUrl: signedUrl });
   } catch (error) {
     logger.error('PDF generation failed:', error.message);

@@ -9,18 +9,19 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendStoryEmail(email, bookTitle, pdfUrl) {
+  // Use the PDF ready template for consistency with story1
+  const html = getPdfReadyTemplate(
+    email.split('@')[0], // Use email prefix as customer name
+    bookTitle,
+    pdfUrl,
+    process.env.APP_URL || 'http://localhost:3000'
+  );
+
   const mailOptions = {
     from: `"AI StoryTime" <${process.env.SMTP_USER}>`,
     to: email,
     subject: `✨ Your Story is Ready: ${bookTitle}`,
-    html: `
-      <div style="font-family: sans-serif; padding: 20px;">
-        <h1>Your magical adventure is ready!</h1>
-        <p>We've finished painting the illustrations for <strong>${bookTitle}</strong>.</p>
-        <p>You can download your high-resolution PDF here:</p>
-        <a href="${pdfUrl}" style="padding: 10px 20px; background: #3b82f6; color: white; text-decoration: none; border-radius: 5px;">Download PDF</a>
-      </div>
-    `,
+    html: html,
   };
 
   try {
@@ -54,4 +55,41 @@ async function sendShippingEmail(email, bookTitle, trackingUrl) {
   }
 }
 
-module.exports = { sendStoryEmail, sendShippingEmail };
+/**
+ * HTML template for when a PDF is ready
+ */
+function getPdfReadyTemplate(customerName, bookTitle, signedPdfUrl, libraryUrl) {
+  return `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px; border: 1px solid #f0f0f0; border-radius: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <span style="font-size: 40px;">🎨</span>
+        <h1 style="color: #1a1a1a; font-size: 28px; font-weight: 900; margin: 10px 0;">Your Masterpiece is Ready!</h1>
+      </div>
+
+      <p style="color: #444; font-size: 16px; line-height: 1.6;">
+        Hi ${customerName},<br><br>
+        Great news! The digital bindery has finished processing your book: <strong>"${bookTitle}"</strong>. Your high-resolution PDF is now ready for you to view or download.
+      </p>
+
+      <div style="text-align: center; margin: 40px 0;">
+        <a href="${libraryUrl}" style="background-color: #3b82f6; color: white; padding: 16px 35px; text-decoration: none; font-weight: bold; border-radius: 12px; font-size: 18px; box-shadow: 0 10px 20px rgba(59,130,246,0.3); display: inline-block; margin-bottom: 20px;">
+          Go to My Library
+        </a>
+        <br>
+        <a href="${signedPdfUrl}" style="color: #6366f1; text-decoration: none; font-weight: bold; font-size: 14px;">
+          Or download directly (Link expires in 7 days)
+        </a>
+      </div>
+
+      <p style="color: #666; font-size: 14px; text-align: center;">
+        If you ordered a physical hardcover, it has now moved to the printing and binding stage. We will notify you once it ships!
+      </p>
+
+      <div style="text-align: center; color: #aaa; font-size: 12px; padding-top: 20px; border-top: 1px solid #eee; margin-top: 40px;">
+        © 2026 AI StoryTime. All rights reserved.
+      </div>
+    </div>
+  `;
+}
+
+module.exports = { sendStoryEmail, sendShippingEmail, getPdfReadyTemplate };
