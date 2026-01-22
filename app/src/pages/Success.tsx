@@ -13,20 +13,22 @@ export default function SuccessPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let interval: any;
+    let interval: NodeJS.Timeout | null = null;
     if (bookId) {
-      setLoading(false); // Set loading to false immediately after setting up the interval
       interval = setInterval(async () => {
         try {
           const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
           if (res.data.pdfUrl) {
             setPdfUrl(res.data.pdfUrl);
             clearInterval(interval);
+            setLoading(false); // Move setLoading to when we have the data
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
           console.error('Polling failed', e);
         }
       }, 10000);
+    } else {
+      setLoading(false); // Set loading to false if no bookId
     }
     return () => clearInterval(interval);
   }, [bookId]);

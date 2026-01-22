@@ -9,8 +9,9 @@ export const useCheckout = () => {
     setError(null);
 
     try {
-      // Call backend to create checkout session
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/create-checkout`, {
+      // Use the provided API_URL or fallback to relative path for better production compatibility
+      const baseUrl = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${baseUrl}/api/create-checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -31,9 +32,10 @@ export const useCheckout = () => {
       } else {
         throw new Error('No checkout URL returned');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
       console.error('Checkout error:', err);
-      setError(err.message || 'An error occurred during checkout');
+      setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);

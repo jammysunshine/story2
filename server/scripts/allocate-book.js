@@ -20,23 +20,23 @@ async function allocateUnallocatedBooks() {
     const db = client.db('story-db-v2');
     console.log('Got DB reference');
 
-    // Find all books where userId is null
-    console.log('Querying for unallocated books...');
-    const unallocatedBooks = await db.collection('books').find({ userId: null }).toArray();
-    console.log('Query completed');
+    // Count unallocated books
+    const totalCount = await db.collection('books').countDocuments({ userId: null });
+    console.log(`Found ${totalCount} unallocated books. Allocating to ${USER_EMAIL}...`);
 
-    if (unallocatedBooks.length === 0) {
+    if (totalCount === 0) {
       console.log('No unallocated books found.');
       return;
     }
 
-    console.log(`Found ${unallocatedBooks.length} unallocated books. Allocating to ${USER_EMAIL}...`);
-
+    // Process one by one
+    const cursor = db.collection('books').find({ userId: null });
     let processed = 0;
-    for (const book of unallocatedBooks) {
+    while (await cursor.hasNext()) {
+      const book = await cursor.next();
       processed++;
       const bookId = book._id.toString();
-      console.log(`Processing book ${processed}/${unallocatedBooks.length}: ${bookId}`);
+      console.log(`Processing book ${processed}/${totalCount}: ${bookId}`);
 
       // Update the book
       console.log(`Updating book ${bookId} in DB`);

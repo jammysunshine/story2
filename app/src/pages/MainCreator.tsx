@@ -168,9 +168,10 @@ export default function MainCreator() {
         toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
         return userData; // Return for chaining
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       console.error('Login failed', err);
-      toast({ title: "Login Failed", description: err.message || "Could not sign in with Google", variant: "destructive" });
+      toast({ title: "Login Failed", description: errorMessage || "Could not sign in with Google", variant: "destructive" });
     }
     return null;
   };

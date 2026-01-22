@@ -32,7 +32,8 @@ const REQUIRED_ENV_VARS = [
   'APP_URL',
   'PRINT_PRICE_AMOUNT',
   'BASE_CURRENCY',
-  'GELATO_API_KEY'
+  'GELATO_API_KEY',
+  'MONGODB_DB_NAME'
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
@@ -66,6 +67,7 @@ const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'story-db-v2';
 
 const STORY_COST = parseInt(process.env.STORY_COST || '10');
 const IMAGE_COST = parseInt(process.env.IMAGE_COST || '2');
@@ -83,8 +85,8 @@ let db;
 async function connectDB() {
   const client = new MongoClient(process.env.MONGODB_URI, { family: 4 });
   await client.connect();
-  db = client.db('story-db-v2');
-  logger.info('✅ Connected to MongoDB');
+  db = client.db(MONGODB_DB_NAME);
+  logger.info(`✅ Connected to MongoDB Database: ${MONGODB_DB_NAME}`);
 }
 
 // --- SECURITY: SIGNED URLS ---
