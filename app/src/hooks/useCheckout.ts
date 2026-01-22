@@ -19,7 +19,7 @@ export const useCheckout = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData: { error?: string } = await response.json();
         throw new Error(errorData.error || 'Failed to create checkout session');
       }
 

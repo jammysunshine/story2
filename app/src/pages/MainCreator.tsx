@@ -51,11 +51,50 @@ export default function MainCreator() {
   const { toast } = useToast()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
-  const [book, setBook] = useState<any>(null)
+  interface BookPage {
+    pageNumber: number;
+    text: string;
+    prompt: string;
+    imageUrl?: string;
+    url?: string;
+  }
+
+  interface Book {
+    _id?: string;
+    bookId?: string;
+    title?: string;
+    childName?: string;
+    pages?: BookPage[];
+    status?: string;
+    heroBible?: string;
+    animalBible?: string;
+    finalPrompt?: string;
+    photoUrl?: string;
+    pdfUrl?: string;
+    isDigitalUnlocked?: boolean;
+    userId?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+  }
+
+  const [book, setBook] = useState<Book | null>(null)
   const isHydrated = useRef(false);
 
   console.log('MainCreator render: step', step, 'bookId', book?.bookId)
-  const [user, setUser] = useState<any>(null)
+  interface User {
+    email: string;
+    name: string;
+    id?: string;
+    createdAt?: Date;
+    updatedAt?: Date;
+    credits?: number;
+    storiesCount?: number;
+    imagesCount?: number;
+    pdfsCount?: number;
+    recentBooks?: any[]; // Simplified for now
+  }
+
+  const [user, setUser] = useState<User | null>(null)
 
   const { createCheckoutSession, loading: checkoutLoading } = useCheckout();
   
@@ -304,11 +343,11 @@ export default function MainCreator() {
     finally { setLoading(false) }
   }
 
-  const renderSelect = (label: string, field: string, choices: string[]) => (
+  const renderSelect = (label: string, field: keyof typeof formData, choices: string[]) => (
     <div>
       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">{label}</label>
       <select
-        value={(formData as any)[field]}
+        value={formData[field]}
         onChange={e => setFormData({...formData, [field]: e.target.value})}
         className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm border border-transparent focus:border-primary/30 transition-all shadow-sm focus:shadow-lg focus:shadow-primary/10"
       >

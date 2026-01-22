@@ -29,7 +29,9 @@ const REQUIRED_ENV_VARS = [
   'GOOGLE_CLIENT_ID',
   'MONGODB_URI',
   'GOOGLE_APPLICATION_CREDENTIALS',
-  'APP_URL'
+  'APP_URL',
+  'PRINT_PRICE_AMOUNT',
+  'BASE_CURRENCY'
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
@@ -43,6 +45,7 @@ if (missingVars.length > 0) {
 }
 
 // --- GLOBAL SAFETY NETS ---
+
 process.on('uncaughtException', (err) => {
   logger.error('🔥 CRITICAL: Uncaught Exception!', { message: err.message, stack: err.stack });
 });
@@ -60,6 +63,8 @@ app.use(cors());
 
 const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
+const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
+const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
 
 // Initialize Services
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
