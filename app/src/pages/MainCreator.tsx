@@ -136,13 +136,15 @@ export default function MainCreator() {
   useEffect(() => {
     let interval: any;
     if (step === 3 && book?.bookId) {
-      interval = setInterval(async () => {
+      const poll = async () => {
         const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
-        if (res.data.status === 'teaser_ready' || res.data.status === 'illustrated') {
+        if (res.data.status === 'teaser' || res.data.status === 'illustrated') {
           setBook({ ...book, pages: res.data.pages });
           if (res.data.status === 'illustrated') clearInterval(interval);
         }
-      }, 5000);
+      };
+      poll(); // Poll immediately
+      interval = setInterval(poll, 5000);
     }
     return () => clearInterval(interval);
   }, [step, book?.bookId]);
