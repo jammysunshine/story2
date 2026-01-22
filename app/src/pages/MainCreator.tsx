@@ -20,11 +20,12 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 const API_URL = 'http://localhost:3001/api'
 const TEASER_LIMIT = 7;
 
-// Pricing Constants
-const STORY_COST = import.meta.env.VITE_STORY_COST || '10';
-const IMAGE_COST = import.meta.env.VITE_IMAGE_COST || '2';
-const PDF_COST = import.meta.env.VITE_PDF_COST || '15';
-const BOOK_COST = import.meta.env.VITE_PRINT_PRICE || '25';
+// Pricing Constants (currently defined but not used in this component)
+const _STORY_COST = import.meta.env.VITE_STORY_COST || '10';
+const _IMAGE_COST = import.meta.env.VITE_IMAGE_COST || '2';
+const _PDF_COST = import.meta.env.VITE_PDF_COST || '15';
+const _BOOK_COST = import.meta.env.VITE_PRINT_PRICE || '25';
+
 
 const options = {
   genders: ['Boy', 'Girl'],
@@ -97,7 +98,14 @@ export default function MainCreator() {
     storiesCount?: number;
     imagesCount?: number;
     pdfsCount?: number;
-    recentBooks?: any[]; // Simplified for now
+    recentBooks?: {
+      id: string;
+      title: string;
+      thumbnailUrl: string;
+      status: string;
+      isDigitalUnlocked: boolean;
+      createdAt: Date;
+    }[];
   }
 
   const [user, setUser] = useState<User | null>(null)
@@ -238,7 +246,7 @@ export default function MainCreator() {
     });
   };
 
-  const pollingRef = useRef<any>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     console.warn('--- POLLING USEEFFECT TRIGGERED ---');

@@ -31,7 +31,8 @@ const REQUIRED_ENV_VARS = [
   'GOOGLE_APPLICATION_CREDENTIALS',
   'APP_URL',
   'PRINT_PRICE_AMOUNT',
-  'BASE_CURRENCY'
+  'BASE_CURRENCY',
+  'GELATO_API_KEY'
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
@@ -471,9 +472,8 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
   const sig = req.headers['stripe-signature'];
   let event;
   try {
-    // Need to get raw body for signature verification
-    const requestBody = await getRawBody(req);
-    event = stripe.webhooks.constructEvent(requestBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    // FIX: Use req.body directly as it's already a Buffer from express.raw middleware
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     logger.error(`❌ Webhook signature verification failed: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -548,7 +548,7 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
 
     // 4. Trigger Background Tasks (Painting + PDF + Gelato)
     // Run these as background tasks
-    handleCheckoutComplete(session, bookId, db, type).catch(err => {
+    handleCheckoutComplete(session, bookId, db, type, orderData).catch(err => {
       logger.error('Fulfillment Background Task Failed:', err);
     });
   }
@@ -571,7 +571,7 @@ async function getRawBody(req) {
 }
 
 // Background fulfillment function
-async function handleCheckoutComplete(session, bookId, db, type = 'book') {
+async function handleCheckoutComplete(session, bookId, db, type = 'book', orderData) {
   try {
     logger.info(`🏁 [LIFECYCLE_TRACKER] STARTING fulfillment for Book: ${bookId}`);
 

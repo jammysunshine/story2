@@ -5,6 +5,7 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const crypto = require('crypto');
 const logger = require('./logger');
 
+const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
 
@@ -15,7 +16,6 @@ async function sleep(ms) {
 async function get7DaySignedUrl(pdfUrl) {
   if (!pdfUrl || !pdfUrl.includes('storage.googleapis.com')) return pdfUrl;
   try {
-    const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
     const bucketName = process.env.GCS_PDFS_BUCKET_NAME;
     const url = new URL(pdfUrl);
     const pathParts = url.pathname.split('/').filter(Boolean);
@@ -45,7 +45,6 @@ async function generatePdf(db, bookId) {
 
   const projectId = process.env.GCP_PROJECT_ID;
   logger.info(`🔍 [PDF_GEN_DEBUG] Project ID: "${projectId}"`);
-  const storage = new Storage({ projectId: projectId || undefined });
   const imagesBucketName = process.env.GCS_IMAGES_BUCKET_NAME;
   const imagesBucket = storage.bucket(imagesBucketName);
   

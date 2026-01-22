@@ -12,6 +12,7 @@ const STORY_COST = parseInt(process.env.STORY_COST || '10');
 const PDF_COST = parseInt(process.env.PDF_COST || '15');
 const BOOK_COST = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
+const STORY_BATCH_DELAY_MS = parseInt(process.env.STORY_BATCH_DELAY_MS || '5000');
 
 /**
  * Core image generation logic using Gemini Pro exclusively.
@@ -510,7 +511,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     // SMART PDF TRIGGER
     if (pagesToProcessCount === masterPages.length && !isFulfillment) {
-      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+      const baseUrl = process.env.APP_URL || 'http://localhost:3001';
       giLog.info(`🚀 Triggering background PDF generation for book: ${bookId}`);
       axios.post(`${baseUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed:', e.message));
     }
