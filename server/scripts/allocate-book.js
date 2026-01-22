@@ -30,7 +30,7 @@ async function allocateUnallocatedBooks() {
     }
 
     // Get all unallocated books
-    const unallocatedBooks = await db.collection('books').find({ userId: null }).toArray();
+    const unallocatedBooks = await db.collection('books').find({ userId: null }).limit(1).toArray();
     console.log(`Loaded ${unallocatedBooks.length} books into memory`);
 
     // Process sequentially
@@ -40,7 +40,7 @@ async function allocateUnallocatedBooks() {
       console.log(`Processing book ${i + 1}/${unallocatedBooks.length}: ${bookId} - ${book.title}`);
 
       // Update the book
-      await db.collection('books').updateOne(
+      const result = await db.collection('books').updateOne(
         { _id: book._id },
         {
           $set: {
@@ -52,7 +52,7 @@ async function allocateUnallocatedBooks() {
         }
       );
 
-      console.log(`Allocated book ${bookId}`);
+      console.log(`Update result for ${bookId}:`, result);
     }
 
     console.log('All unallocated books allocated successfully.');
