@@ -23,7 +23,7 @@ async function callGeminiImageGen(params) {
     if (apiKey) {
       log.info(`🤖 [Page ${pageNumber}] Attempting Gemini Pro...`);
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+      const model = genAI.getGenerativeModel({ model: process.env.GOOGLE_IMAGE_MODEL || 'gemini-2.5-flash-image' });
       
       const parts = [{ text: prompt }];
       let hasImages = false;

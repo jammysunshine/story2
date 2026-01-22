@@ -78,7 +78,7 @@ async function uploadToGCS(buffer, fileName, contentType) {
 }
 
 async function generateImageRace(prompt, bookId, pageNumber) {
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-image-preview' });
+  const model = genAI.getGenerativeModel({ model: process.env.GOOGLE_IMAGE_MODEL || 'gemini-2.5-flash-image' });
   try {
     logger.info(`🎨 Painting Page ${pageNumber} for Book ${bookId}`);
     const result = await model.generateContent(prompt);
