@@ -471,6 +471,35 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
+// GET USER'S LIBRARY OF BOOKS
+app.get('/api/user/library', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const email = await getUserEmailFromToken(token);
+    if (!email) throw new Error('Could not resolve email from token');
+
+    logger.info(`📚 [LIBRARY_FETCH] Fetching books for email: ${email}`);
+    const books = await db.collection('books').find({
+      $or: [
+        { email: email.toLowerCase() },
+        { userId: email.toLowerCase() }
+      ]
+    }).sort({ createdAt: -1 }).toArray();
+
+    logger.info(`📚 [LIBRARY_FETCH] Found ${books.length} books for ${email}`);
+    res.json({ success: true, books });
+  } catch (error) {
+    logger.warn('Library fetch blocked (Invalid/Missing Token):', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+
 app.get('/api/book-status', async (req, res) => {
   const { bookId } = req.query;
   try {

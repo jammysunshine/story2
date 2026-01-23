@@ -60,6 +60,13 @@ export default function SuccessPage() {
   };
 
   useEffect(() => {
+    // Set flag so MainCreator knows to refresh book state
+    if (bookId) {
+      localStorage.setItem('justPaid', 'true');
+    }
+  }, [bookId]);
+
+  useEffect(() => {
     let intervalId: any = null;
 
     const pollStatus = async () => {

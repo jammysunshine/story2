@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser } from 'lucide-react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser, FileDown } from 'lucide-react'
 import axios from 'axios'
 import {
   Sheet,
@@ -89,6 +89,10 @@ export default function MainCreator() {
   const [book, setBook] = useState<Book | null>(null)
   const bookRef = useRef<Book | null>(null); // To solve stale closure in poller
   const isHydrated = useRef(false);
+  const [pdfReady, setPdfReady] = useState(false);
+  const [showPdfToast, setShowPdfToast] = useState(false);
+  const [library, setLibrary] = useState<any[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
 
   // Calculate progress based on images generated
   const calculateProgress = () => {
@@ -176,6 +180,7 @@ export default function MainCreator() {
       console.warn('👤 Restored User:', parsedUser.email);
       // Auto-fetch orders for returning user
       fetchOrders(parsedUser.token);
+      fetchLibrary(parsedUser.token);
     }
 
     const savedBook = localStorage.getItem('book');
@@ -513,6 +518,22 @@ export default function MainCreator() {
     }
   };
 
+  const fetchLibrary = async (explicitToken?: string) => {
+    const token = explicitToken || user?.token;
+    if (!token || token.length < 10) return;
+    setLibraryLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/user/library`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setLibrary(res.data.books || []);
+    } catch (e) {
+      console.error('Library fetch failed:', e);
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
   const generateStory = async () => {
     console.warn('🚀 FRONTEND: generateStory CALLED');
     console.warn('Payload:', { ...formData, photoUrl, email: user?.email });
@@ -644,7 +665,12 @@ export default function MainCreator() {
             <button
               onClick={() => {
                 const pdfUrl = book?.pdfUrl;
-                if (pdfUrl) window.open(pdfUrl, '_blank');
+                if (pdfUrl) {
+                  const link = document.createElement('a');
+                  link.href = pdfUrl;
+                  link.download = `${book.title || 'story'}.pdf`;
+                  link.click();
+                }
                 setShowPdfToast(false);
               }}
               className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all"
@@ -1047,6 +1073,36 @@ export default function MainCreator() {
                   )}
                 </div>
               </div>
+
+              <div className="bg-slate-950/50 p-10 rounded-[2.5rem] border border-white/5 space-y-6">
+                <div className="flex items-center gap-3">
+                  <FileDown className="text-primary w-6 h-6" />
+                  <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Your Downloads</h3>
+                </div>
+                {library.filter(b => b.pdfUrl).length === 0 ? (
+                  <p className="text-sm text-slate-500">No PDFs available yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {library.filter(b => b.pdfUrl).map(book => (
+                      <a
+                        key={book._id}
+                        href={book.pdfUrl}
+                        download={`${book.title}.pdf`}
+                        className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-white/5 hover:border-primary/30 transition-all group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="text-primary w-5 h-5" />
+                          <div>
+                            <p className="font-bold text-sm text-white group-hover:text-primary transition-colors">{book.title}</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wider">PDF Ready</p>
+                          </div>
+                        </div>
+                        <FileDown className="w-4 h-4 text-slate-600 group-hover:text-primary transition-colors" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1116,17 +1172,17 @@ export default function MainCreator() {
               </div>
               <Button onClick={() => login()} size="lg" className="h-20 px-10 rounded-[1.5rem] font-black uppercase tracking-widest text-lg shadow-2xl shadow-primary/30 active:scale-95 transition-all">Sign In with Google</Button>
             </div>
-          ) : user.recentBooks && user.recentBooks.length > 0 ? (
+          ) : library.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
-              {user.recentBooks.map((b) => (
-                <div key={`${b.id}-${b.status}`} onClick={() => {
-                  setBook({ ...b, bookId: b.id });
+              {library.map((b) => (
+                <div key={`${b._id}-${b.status}`} onClick={() => {
+                  setBook({ ...b, bookId: b._id });
                   setStep(3);
                   setActiveTab('creator');
                 }} className="group cursor-pointer space-y-4">
                   <div className="aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden border-8 border-white/5 shadow-2xl group-hover:border-primary/50 group-hover:scale-[1.02] transition-all relative">
-                    {b.thumbnailUrl ? (
-                      <img src={b.thumbnailUrl} className="w-full h-full object-cover" alt={b.title} />
+                    {b.pages?.[0]?.imageUrl ? (
+                      <img src={b.pages[0].imageUrl} className="w-full h-full object-cover" alt={b.title} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-slate-800">
                         <Palette className="text-slate-700 w-16 h-16 animate-pulse" />
