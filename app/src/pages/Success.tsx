@@ -58,7 +58,7 @@ export default function SuccessPage() {
 
   return (
     <div className="max-w-3xl mx-auto py-12 px-6 bg-slate-950 min-h-screen text-white font-sans">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="text-center mb-16 space-y-6"
@@ -123,7 +123,7 @@ export default function SuccessPage() {
             <div className="absolute inset-0 bg-primary/5 animate-pulse" />
             <Loader2 className="animate-spin text-primary mx-auto mb-6 relative z-10" size={40} />
             <p className="text-xs font-black text-slate-300 uppercase tracking-[0.2em] relative z-10">
-              Preparing your <br/> High-Resolution PDF...
+              Preparing your <br /> High-Resolution PDF...
             </p>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-4 relative z-10 italic">Est. time: 6-8 mins</p>
           </div>
@@ -136,7 +136,15 @@ export default function SuccessPage() {
         )}
 
         <div className="flex flex-col gap-4 w-full max-w-md">
-          <Link to="/" className="w-full h-16 bg-white text-slate-900 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-slate-100 active:scale-98 transition-all group hover:shadow-2xl hover:shadow-primary/20">
+          <Link
+            to="/"
+            onClick={() => {
+              localStorage.removeItem('book');
+              localStorage.setItem('step', '1');
+              localStorage.setItem('activeTab', 'creator');
+            }}
+            className="w-full h-16 bg-white text-slate-900 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-slate-100 active:scale-98 transition-all group hover:shadow-2xl hover:shadow-primary/20"
+          >
             Create Another Adventure <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform text-primary" />
           </Link>
           <p className="text-center text-slate-600 font-bold text-[10px] uppercase tracking-[0.3em]">Thank you for your magic!</p>

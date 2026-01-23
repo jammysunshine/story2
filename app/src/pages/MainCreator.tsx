@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText } from 'lucide-react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser } from 'lucide-react'
 import axios from 'axios'
 import {
   Sheet,
@@ -12,7 +12,6 @@ import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
 import { useToast } from "../hooks/use-toast"
 import { useCheckout } from "../hooks/useCheckout";
-import { LibraryDropdown } from "../components/LibraryDropdown";
 
 import { Capacitor } from '@capacitor/core'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
@@ -59,6 +58,7 @@ const getRandomItem = (array: string[]) => array[Math.floor(Math.random() * arra
 export default function MainCreator() {
   const { toast } = useToast()
   const [step, setStep] = useState(1)
+  const [activeTab, setActiveTab] = useState<'creator' | 'bookshelf' | 'account'>('creator')
   const [loading, setLoading] = useState(false)
   interface BookPage {
     pageNumber: number;
@@ -105,6 +105,10 @@ export default function MainCreator() {
     const totalPages = book.pages.length;
     const completedPages = book.pages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
     return Math.round((completedPages / totalPages) * 100);
+  };
+
+  const isPaid = () => {
+    return ['paid', 'illustrated', 'printing', 'pdf_ready'].includes(book?.status || '');
   };
 
   // Sync ref with state whenever book changes
@@ -188,6 +192,12 @@ export default function MainCreator() {
       console.warn('📍 Restored Step:', parsedStep);
     }
 
+    const savedTab = localStorage.getItem('activeTab') as 'creator' | 'bookshelf' | 'account';
+    if (savedTab) {
+      setActiveTab(savedTab);
+      console.warn('📍 Restored Tab:', savedTab);
+    }
+
     // 2. LOCK HYDRATION (Wait a frame to ensure state is restored before persistence wakes up)
     setTimeout(() => {
       isHydrated.current = true;
@@ -204,6 +214,11 @@ export default function MainCreator() {
     if (!isHydrated.current) return;
     localStorage.setItem('step', step.toString());
   }, [step]);
+
+  useEffect(() => {
+    if (!isHydrated.current) return;
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
 
   const login = async () => {
     const isWeb = Capacitor.getPlatform() === 'web';
@@ -387,8 +402,8 @@ export default function MainCreator() {
           // Stop polling if we reached a final state
           // NOTE: We don't stop on 'paid' anymore since full image generation and PDF generation happen after payment
           // We continue polling if status is 'teaser_ready' but images are not fully loaded yet
-          if (['preview', 'illustrated', 'printing', 'pdf_ready'].includes(newStatus) ||
-              (newStatus === 'teaser_ready' && calculateProgress() === 100)) {
+          if (['preview', 'illustrated', 'printing', 'printing_test', 'pdf_ready'].includes(newStatus) ||
+            (newStatus === 'teaser_ready' && calculateProgress() === 100)) {
             console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
             if (pollingRef.current) {
               clearInterval(pollingRef.current);
@@ -416,7 +431,7 @@ export default function MainCreator() {
 
   const fetchOrders = async (explicitToken?: string) => {
     const token = explicitToken || user?.token;
-    if (!token) return;
+    if (!token || token.length < 10) return;
     setOrdersLoading(true);
     try {
       const res = await axios.get(`${API_URL}/orders`, {
@@ -499,6 +514,31 @@ export default function MainCreator() {
     finally { setLoading(false) }
   }
 
+  const resetCreator = () => {
+    setBook(null);
+    setStep(1);
+    setPhotoUrl('');
+    setFormData({
+      childName: 'Emma',
+      age: '5',
+      gender: 'Girl',
+      skinTone: 'Fair',
+      hairStyle: 'Long',
+      hairColor: 'Blonde',
+      animal: 'Lion',
+      characterStyle: 'Disney-inspired 3D render',
+      location: 'Magical Forest',
+      lesson: 'Kindness',
+      occasion: 'Everyday Adventure'
+    });
+    setActiveTab('creator');
+    localStorage.removeItem('book');
+    toast({
+      title: "✨ Home Sweet Home",
+      description: "Ready for a new adventure?",
+    });
+  };
+
   const renderSelect = (label: string, field: keyof typeof formData, choices: string[]) => (
     <div>
       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">{label}</label>
@@ -512,22 +552,453 @@ export default function MainCreator() {
     </div>
   )
 
+  const MagicGlow = ({ color = 'pink' }: { color?: 'pink' | 'blue' | 'amber' | 'purple' | 'green' }) => {
+    const colorMap: Record<string, string> = {
+      pink: 'from-pink-500/30 to-rose-500/30 border-pink-500/50',
+      blue: 'from-blue-500/30 to-indigo-500/30 border-blue-500/50',
+      amber: 'from-amber-500/30 to-orange-500/30 border-amber-500/50',
+      purple: 'from-purple-500/30 to-indigo-500/30 border-purple-500/50',
+      green: 'from-green-500/30 to-emerald-500/30 border-green-500/50'
+    };
+
+    return (
+      <div className="relative w-48 h-48 mx-auto group">
+        <style dangerouslySetInnerHTML={{
+          __html: `
+          @keyframes magic-float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(2deg); }
+          }
+          @keyframes magic-glow-1 {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.2); opacity: 0.6; }
+          }
+          @keyframes magic-glow-2 {
+            0%, 100% { transform: scale(1.1); opacity: 0.2; }
+            50% { transform: scale(1.4); opacity: 0.4; }
+          }
+          .animate-magic-float { animation: magic-float 3s ease-in-out infinite; }
+          .animate-magic-glow-1 { animation: magic-glow-1 4s ease-in-out infinite; }
+          .animate-magic-glow-2 { animation: magic-glow-2 6s ease-in-out infinite; }
+        `}} />
+        <div className={`absolute inset-0 bg-gradient-to-tr ${colorMap[color]} rounded-full blur-3xl animate-magic-glow-2`} />
+        <div className={`absolute inset-0 bg-gradient-to-tr ${colorMap[color]} rounded-full blur-xl animate-magic-glow-1`} />
+        <div className={`relative bg-slate-900/80 backdrop-blur-md border-4 ${colorMap[color].split(' ').pop()} w-full h-full rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-magic-float`}>
+          {(color === 'pink' || color === 'blue') ? <Palette className="text-white w-20 h-20 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" /> :
+            (color === 'amber' || color === 'green') ? <FileText className="text-white w-20 h-20 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" /> :
+              <Package className="text-white w-20 h-20 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 font-sans pb-20">
-      <header className="flex justify-between items-center mb-12 pt-[env(safe-area-inset-top)]">
-        <h1 className="text-2xl font-black tracking-tighter uppercase text-primary flex items-center gap-2">
+      <header className="flex flex-col md:flex-row justify-between items-center mb-12 pt-[env(safe-area-inset-top)] gap-6">
+        <h1
+          onClick={resetCreator}
+          className="text-2xl font-black tracking-tighter uppercase text-primary flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
+        >
           <BookOpen className="text-primary" /> StoryTime
         </h1>
-        <div className="flex items-center gap-3">
-          {user && (
-            <>
-              <LibraryDropdown user={user} />
+
+        <nav className="flex items-center bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 shadow-inner">
+          <button
+            onClick={() => setActiveTab('creator')}
+            className={`px-4 md:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'creator' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white'
+              }`}
+          >
+            <Sparkles size={14} /> Creator
+          </button>
+          <button
+            onClick={() => setActiveTab('bookshelf')}
+            className={`px-4 md:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'bookshelf' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white'
+              }`}
+          >
+            <BookOpen size={14} /> Bookshelf
+          </button>
+          <button
+            onClick={() => setActiveTab('account')}
+            className={`px-4 md:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'account' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white'
+              }`}
+          >
+            <CircleUser size={14} /> Account
+          </button>
+        </nav>
+
+        <div className="hidden md:flex items-center gap-3">
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-800 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-white/10">{user.name.split(' ')[0]}</div>
+              <button onClick={logout} className="text-[10px] font-black text-slate-500 uppercase hover:text-red-400 transition-colors hover:underline">Logout</button>
+            </div>
+          ) : (
+            <button onClick={async () => { await login(); }} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30 hover:scale-[1.02]">Login</button>
+          )}
+        </div>
+      </header>
+
+      {activeTab === 'creator' && (
+        <div className="space-y-8">
+
+          {step === 1 && (
+            <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <h2 className="text-4xl font-black uppercase tracking-tighter text-white">The Hero</h2>
+                <Button
+                  variant="outline"
+                  onClick={randomizeFormData}
+                  className="rounded-full border-primary/30 text-primary hover:bg-primary/10 h-10 px-6 text-xs font-black uppercase tracking-widest hover:shadow-lg hover:shadow-primary/20 transition-all"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Surprise Me
+                </Button>
+              </div>
+
+              <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl space-y-6">
+                {/* Magic Photo Scan */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
+                    } hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] transition-transform`}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    accept="image/*"
+                  />
+
+                  {isUploading ? (
+                    <div className="flex flex-col items-center">
+                      <Loader2 className="animate-spin text-primary mb-4" size={32} />
+                      <p className="text-[10px] font-black text-white uppercase tracking-widest">Scanning Magic Features...</p>
+                    </div>
+                  ) : photoUrl ? (
+                    <div className="flex flex-col items-center">
+                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-green-500 mb-4 shadow-lg shadow-green-500/20">
+                        <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                      <h4 className="text-sm font-black text-green-400 uppercase tracking-widest mb-1">Magic Link Established</h4>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase">Character will sync with this photo</p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPhotoUrl(''); }}
+                        className="mt-4 text-[8px] font-black uppercase text-red-400 hover:text-red-500 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 size={10} /> REMOVE PHOTO
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-white/5">
+                        <Camera className="text-slate-400 group-hover:text-primary transition-colors" size={32} />
+                      </div>
+                      <h4 className="text-lg font-black text-white uppercase tracking-widest mb-2">Magic Photo Scan</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed max-w-[200px]">Upload a photo to sync your child's features with the AI character.</p>
+                      <Badge variant="outline" className="mt-4 border-amber-500/30 text-amber-500 text-[8px] font-black uppercase bg-amber-500/5">Enable Character Sync</Badge>
+                    </>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
+                    <input value={formData.childName} onChange={e => setFormData({ ...formData, childName: e.target.value })} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
+                  </div>
+
+                  {renderSelect('Age', 'age', ['3', '4', '5', '6', '7', '8', '9', '10'])}
+                  {renderSelect('Gender', 'gender', options.genders)}
+                  {renderSelect('Skin Tone', 'skinTone', options.skinTones)}
+                  {renderSelect('Hair Style', 'hairStyle', options.hairStyles)}
+                  {renderSelect('Hair Color', 'hairColor', options.hairColors)}
+                  {renderSelect('Animal Friend', 'animal', randomAnimals)}
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-1 gap-4">
+                  {renderSelect('Art Style', 'characterStyle', options.styles)}
+                  {renderSelect('Story Location', 'location', options.locations)}
+                  {renderSelect('Life Lesson', 'lesson', randomLessons)}
+                </div>
+              </div>
+
+              <button onClick={generateStory} disabled={loading} className="w-full h-20 bg-primary text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-primary/30 hover:scale-[1.02]">
+                {loading ? <Loader2 className="animate-spin" /> : <Wand2 />}
+                Write My Story
+              </button>
+              <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Premium Story Generation Value: ${STORY_COST} {BASE_CURRENCY}</p>
+            </div>
+          )}
+
+          {step === 2 && book && (
+            <div className="max-w-2xl mx-auto space-y-8 animate-in zoom-in duration-500">
+              <div className="text-center">
+                <h2 className="text-3xl font-black uppercase text-white">{book.title}</h2>
+                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2">Draft Preview</p>
+              </div>
+              <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 max-h-[50vh] overflow-y-auto space-y-8 shadow-inner custom-scrollbar">
+                {book.pages?.map((p: BookPage) => (
+                  <div key={p.pageNumber} className="relative pl-8">
+                    <span className="absolute left-0 top-0 text-[10px] font-black text-primary opacity-50">{p.pageNumber}</span>
+                    <p className="text-xl text-slate-200 italic leading-relaxed">"{p.text}"</p>
+                  </div>
+                ))}
+              </div>
+              <button onClick={startPainting} disabled={loading} className="w-full h-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-blue-500/30 hover:scale-[1.02]">
+                {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                Approve & Illustrate
+              </button>
+              <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Full Book Illustration Value: ${parseInt(IMAGE_COST) * 23} {BASE_CURRENCY}</p>
+              <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-400 transition-colors">Edit Hero Details</button>
+            </div>
+          )}
+
+          {step === 3 && book && (
+            <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
+              {/* Check if we're in the painting phase (not all teaser images are done yet) */}
+              {(book.status === 'generating' || book.status === 'teaser_generating' ||
+                (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
+                // Show centralized loading animation when teaser images are being generated
+                <div className="py-20 text-center space-y-10">
+                  <MagicGlow color="pink" />
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
+                    <p className="text-slate-400 text-lg font-medium">Generating {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} stunning AI illustrations...</p>
+                  </div>
+                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${calculateProgress()}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    Estimated Time: 2-3 Minutes
+                  </p>
+                </div>
+              ) : book.status === 'teaser_ready' && calculateProgress() < 100 ? (
+                // Special case: if status is teaser_ready but progress is still < 100%, show loading
+                <div className="py-20 text-center space-y-10">
+                  <MagicGlow color="pink" />
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finishing Teaser Illustrations</h2>
+                    <p className="text-slate-400 text-lg font-medium">Finalizing {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} teaser illustrations...</p>
+                  </div>
+                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${calculateProgress()}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    Almost Ready!
+                  </p>
+                </div>
+              ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
+                // Show centralized loading animation when full book images are being generated after payment
+                <div className="py-20 text-center space-y-10">
+                  <MagicGlow color="blue" />
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
+                    <p className="text-slate-400 text-lg font-medium">Generating all {book.pages?.length || 23} illustrations for your full book...</p>
+                  </div>
+                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${calculateFullBookProgress()}%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    Estimated Time: 5-8 Minutes
+                  </p>
+                </div>
+              ) : book.status === 'paid' && !book.pdfUrl ? (
+                // Show loading animation when PDF is being generated
+                <div className="py-20 text-center space-y-10">
+                  <MagicGlow color="amber" />
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
+                    <p className="text-slate-400 text-lg font-medium">Assembling your beautifully illustrated book into a high-quality PDF...</p>
+                  </div>
+                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000 ease-out"
+                      style={{
+                        width: '75%' // PDF generation is typically quick once images are ready
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    EST. TIME: 6-8 MINS
+                  </p>
+                </div>
+              ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
+                // Show loading animation when PDF is being prepared for download
+                <div className="py-20 text-center space-y-10">
+                  <MagicGlow color="green" />
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finalizing Your PDF</h2>
+                    <p className="text-slate-400 text-lg font-medium">Your PDF is ready! Preparing download link...</p>
+                  </div>
+                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-1000 ease-out"
+                      style={{
+                        width: '100%'
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    Almost Ready!
+                  </p>
+                </div>
+              ) : book.status === 'printing' ? (
+                // Show loading animation when book is being printed
+                <div className="py-20 text-center space-y-10">
+                  <MagicGlow color="purple" />
+                  <div className="space-y-4">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Printing Your Book</h2>
+                    <p className="text-slate-400 text-lg font-medium">Your hardcover book is being professionally printed and will ship soon!</p>
+                  </div>
+                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 ease-out"
+                      style={{
+                        width: '100%'
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                    On Its Way To You!
+                  </p>
+                </div>
+              ) : (
+                // Show the book preview with individual page placeholders
+                <>
+                  <div className="text-center">
+                    <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
+                    <p className="text-slate-400 mt-4">We're painting the first {TEASER_LIMIT} pages for free!</p>
+                  </div>
+
+                  <div className="space-y-20">
+                    {book.pages?.map((p: BookPage, i: number) => (
+                      <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
+                        <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
+                          {(i < TEASER_LIMIT || isPaid()) ? (
+                            p.imageUrl && !p.imageUrl.includes('placeholder') ? (
+                              <img
+                                key={p.imageUrl}
+                                src={p.imageUrl}
+                                className="w-full h-full object-cover"
+                                alt={`Page ${i + 1}`}
+                                onError={() => {
+                                  console.error(`Failed to load image: ${p.imageUrl}`);
+                                  // If image fails to load, it might be an expired signed URL
+                                  // We can't easily trigger a single page refresh here without complex state,
+                                  // but the poller will eventually get a new one.
+                                  // For now, let's just log it.
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
+                                <Palette className="text-slate-700 w-12 h-12" />
+                                <p className="text-[10px] font-black uppercase text-slate-700 tracking-widest text-center px-8">AI is painting this page...</p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-700">
+                              <Lock size={48} />
+                              <p className="text-[10px] font-black uppercase tracking-widest">Order to Unlock Illustration</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg">
+                          <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
+                <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
+                <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
+
+                <div className="flex flex-col gap-4">
+                  {book.pdfUrl && (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => window.open(book.pdfUrl, '_blank')}
+                        className="w-full h-14 bg-slate-800 text-white rounded-xl font-bold text-lg border border-white/10 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink size={20} />
+                        View Digital PDF
+                      </button>
+                      <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">Digital PDF Edition: ${PDF_COST} {BASE_CURRENCY}</p>
+                    </div>
+                  )}
+
+                  {!isPaid() && (
+                    <button
+                      onClick={async () => {
+                        let currentUser = user;
+                        if (!currentUser) {
+                          toast({ title: "Login Required", description: "Please sign in to order your book!" });
+                          currentUser = await login();
+                          if (!currentUser) return; // User cancelled login
+                        }
+
+                        if (book && book.bookId && book.title) {
+                          createCheckoutSession(book.bookId, book.title, currentUser?.email);
+                        } else {
+                          toast({
+                            title: "Error",
+                            description: "Book information not available. Please try again.",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                      disabled={checkoutLoading}
+                      className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                    >
+                      {checkoutLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Order Hardcover (${BOOK_COST} {BASE_CURRENCY})
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'bookshelf' && (
+        <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="flex justify-between items-center">
+            <h2 className="text-5xl font-black uppercase tracking-tighter text-white">My Bookshelf</h2>
+            <div className="flex gap-4">
               <Sheet onOpenChange={(open) => open && fetchOrders()}>
                 <SheetTrigger asChild>
-                  <button className="p-2 bg-slate-800 rounded-xl border border-white/5 relative hover:bg-slate-700/50 transition-colors">
-                    <Package size={18} />
-                    {orders.length > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />}
-                  </button>
+                  <Button variant="outline" className="rounded-2xl border-white/5 text-slate-400 hover:text-white bg-slate-900/50 h-14 px-6 font-black uppercase tracking-widest text-[10px]">
+                    <Package size={18} className="mr-3" /> Recent Orders
+                    {orders.length > 0 && <span className="ml-3 w-2 h-2 bg-primary rounded-full animate-pulse" />}
+                  </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="bg-slate-900 border-white/5 text-white w-full sm:max-w-md z-[100]">
                   <SheetHeader className="pb-6 border-b border-white/5">
@@ -548,7 +1019,7 @@ export default function MainCreator() {
                               <h4 className="font-black text-sm uppercase tracking-tight">Hardcover Book</h4>
                               <p className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt).toLocaleDateString()}</p>
                             </div>
-                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${order.status === 'Shipped' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500 animate-pulse'
+                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${order.status === 'Shipped' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'
                               }`}>
                               {order.status}
                             </span>
@@ -567,387 +1038,97 @@ export default function MainCreator() {
                   </div>
                 </SheetContent>
               </Sheet>
-            </>
-          )}
-          {user ? (
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-800 px-3 py-1.5 rounded-full text-xs font-bold ring-1 ring-white/10">{user.name.split(' ')[0]}</div>
-              <button onClick={logout} className="text-[10px] font-black text-slate-500 uppercase hover:text-red-400 transition-colors hover:underline">Logout</button>
             </div>
-          ) : (
-            <button onClick={async () => { await login(); }} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30 hover:scale-[1.02]">Login</button>
-          )}
-        </div>
-      </header>
-
-      {step === 1 && (
-        <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <h2 className="text-4xl font-black uppercase tracking-tighter text-white">The Hero</h2>
-            <Button
-              variant="outline"
-              onClick={randomizeFormData}
-              className="rounded-full border-primary/30 text-primary hover:bg-primary/10 h-10 px-6 text-xs font-black uppercase tracking-widest hover:shadow-lg hover:shadow-primary/20 transition-all"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Surprise Me
-            </Button>
           </div>
 
-          <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl space-y-6">
-            {/* Magic Photo Scan */}
-            <div
-              onClick={() => fileInputRef.current?.click()}
-              className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
-                } hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] transition-transform`}
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handlePhotoUpload}
-                className="hidden"
-                accept="image/*"
-              />
-
-              {isUploading ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="animate-spin text-primary mb-4" size={32} />
-                  <p className="text-[10px] font-black text-white uppercase tracking-widest">Scanning Magic Features...</p>
-                </div>
-              ) : photoUrl ? (
-                <div className="flex flex-col items-center">
-                  <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-green-500 mb-4 shadow-lg shadow-green-500/20">
-                    <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
+          {!user ? (
+            <div className="bg-slate-900/50 p-20 rounded-[3rem] border border-dashed border-white/10 text-center space-y-8">
+              <div className="w-24 h-24 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto shadow-2xl rotate-3">
+                <Lock className="text-slate-500" size={40} />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-3xl font-black uppercase tracking-tight text-white">Login to see your shelf</h3>
+                <p className="text-slate-400 max-w-sm mx-auto font-medium text-lg leading-relaxed">To view your adventures and track your deliveries, please sign in.</p>
+              </div>
+              <Button onClick={() => login()} size="lg" className="h-20 px-10 rounded-[1.5rem] font-black uppercase tracking-widest text-lg shadow-2xl shadow-primary/30 active:scale-95 transition-all">Sign In with Google</Button>
+            </div>
+          ) : user.recentBooks && user.recentBooks.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
+              {user.recentBooks.map((b) => (
+                <div key={`${b.id}-${b.status}`} onClick={() => {
+                  setBook({ ...b, bookId: b.id });
+                  setStep(3);
+                  setActiveTab('creator');
+                }} className="group cursor-pointer space-y-4">
+                  <div className="aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden border-8 border-white/5 shadow-2xl group-hover:border-primary/50 group-hover:scale-[1.02] transition-all relative">
+                    {b.thumbnailUrl ? (
+                      <img src={b.thumbnailUrl} className="w-full h-full object-cover" alt={b.title} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-800">
+                        <Palette className="text-slate-700 w-16 h-16 animate-pulse" />
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-8 pt-20">
+                      <Badge className="mb-3 bg-primary/20 text-primary border-primary/20 uppercase text-[10px] font-black px-3 py-1">{b.status}</Badge>
+                      <h4 className="text-lg font-black uppercase tracking-tighter text-white leading-tight line-clamp-2">{b.title}</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Click to View Adventure</p>
+                    </div>
                   </div>
-                  <h4 className="text-sm font-black text-green-400 uppercase tracking-widest mb-1">Magic Link Established</h4>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase">Character will sync with this photo</p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setPhotoUrl(''); }}
-                    className="mt-4 text-[8px] font-black uppercase text-red-400 hover:text-red-500 transition-colors flex items-center gap-1"
-                  >
-                    <Trash2 size={10} /> REMOVE PHOTO
-                  </button>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-slate-900/50 p-20 rounded-[3rem] border border-dashed border-white/10 text-center space-y-8">
+              <div className="w-24 h-24 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto shadow-2xl -rotate-3">
+                <BookOpen className="text-slate-500" size={40} />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-3xl font-black uppercase tracking-tight text-white">Your shelf is empty</h3>
+                <p className="text-slate-400 max-w-sm mx-auto font-medium text-lg leading-relaxed">Every great library starts with a single story. Let's create your first adventure!</p>
+              </div>
+              <Button onClick={() => setActiveTab('creator')} size="lg" className="h-20 px-10 rounded-[1.5rem] font-black uppercase tracking-widest text-lg shadow-2xl shadow-primary/30 active:scale-95 transition-all">Start My First Story</Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'account' && (
+        <div className="max-w-2xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="bg-slate-900/50 p-12 rounded-[3.5rem] border border-white/5 flex flex-col items-center gap-8 text-center shadow-2xl transition-all hover:border-primary/20">
+            <div className="w-32 h-32 bg-gradient-to-br from-primary via-purple-600 to-pink-600 rounded-[2.5rem] flex items-center justify-center text-5xl font-black shadow-2xl border-4 border-white/10 rotate-3">
+              {user?.name?.[0] || '?'}
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-5xl font-black uppercase tracking-tighter text-white">{user?.name || 'Guest'}</h2>
+              <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-xs underline underline-offset-8 decoration-primary/30">{user?.email || 'Login to sync collections'}</p>
+            </div>
+
+            <div className="grid grid-cols-1 w-full gap-6 mt-6">
+              <div className="bg-slate-950/50 p-10 rounded-[2.5rem] border border-white/5 space-y-8">
+                <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Adventurer Statistics</h3>
+                <div className="grid grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <p className="text-4xl font-black text-white">{user?.recentBooks?.length || 0}</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Adventures</p>
+                  </div>
+                  <div className="space-y-2 border-x border-white/5 px-2">
+                    <p className="text-4xl font-black text-primary">{user?.recentBooks?.filter(b => b.isDigitalUnlocked).length || 0}</p>
+                    <p className="text-[10px] font-black uppercase text-primary/70 tracking-widest">Unlocked</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-4xl font-black text-white">{orders?.length || 0}</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Physical</p>
+                  </div>
+                </div>
+              </div>
+
+              {user ? (
+                <button onClick={logout} className="w-full h-20 bg-red-500/5 text-red-500/50 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:bg-red-500/10 hover:text-red-500 transition-all border border-red-500/10 flex items-center justify-center gap-3 active:scale-95 group">
+                  <Trash2 size={16} className="group-hover:animate-bounce" /> Logout and End Session
+                </button>
               ) : (
-                <>
-                  <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-white/5">
-                    <Camera className="text-slate-400 group-hover:text-primary transition-colors" size={32} />
-                  </div>
-                  <h4 className="text-lg font-black text-white uppercase tracking-widest mb-2">Magic Photo Scan</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed max-w-[200px]">Upload a photo to sync your child's features with the AI character.</p>
-                  <Badge variant="outline" className="mt-4 border-amber-500/30 text-amber-500 text-[8px] font-black uppercase bg-amber-500/5">Enable Character Sync</Badge>
-                </>
+                <Button onClick={() => login()} size="lg" className="h-20 rounded-[1.5rem] font-black uppercase tracking-widest shadow-2xl">Sign In with Google</Button>
               )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
-                <input value={formData.childName} onChange={e => setFormData({ ...formData, childName: e.target.value })} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
-              </div>
-
-              {renderSelect('Age', 'age', ['3', '4', '5', '6', '7', '8', '9', '10'])}
-              {renderSelect('Gender', 'gender', options.genders)}
-              {renderSelect('Skin Tone', 'skinTone', options.skinTones)}
-              {renderSelect('Hair Style', 'hairStyle', options.hairStyles)}
-              {renderSelect('Hair Color', 'hairColor', options.hairColors)}
-              {renderSelect('Animal Friend', 'animal', randomAnimals)}
-            </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-1 gap-4">
-              {renderSelect('Art Style', 'characterStyle', options.styles)}
-              {renderSelect('Story Location', 'location', options.locations)}
-              {renderSelect('Life Lesson', 'lesson', randomLessons)}
-            </div>
-          </div>
-
-          <button onClick={generateStory} disabled={loading} className="w-full h-20 bg-primary text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-primary/30 hover:scale-[1.02]">
-            {loading ? <Loader2 className="animate-spin" /> : <Wand2 />}
-            Write My Story
-          </button>
-          <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Premium Story Generation Value: ${STORY_COST} {BASE_CURRENCY}</p>
-        </div>
-      )}
-
-      {step === 2 && book && (
-        <div className="max-w-2xl mx-auto space-y-8 animate-in zoom-in duration-500">
-          <div className="text-center">
-            <h2 className="text-3xl font-black uppercase text-white">{book.title}</h2>
-            <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2">Draft Preview</p>
-          </div>
-          <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 max-h-[50vh] overflow-y-auto space-y-8 shadow-inner custom-scrollbar">
-            {book.pages?.map((p: BookPage) => (
-              <div key={p.pageNumber} className="relative pl-8">
-                <span className="absolute left-0 top-0 text-[10px] font-black text-primary opacity-50">{p.pageNumber}</span>
-                <p className="text-xl text-slate-200 italic leading-relaxed">"{p.text}"</p>
-              </div>
-            ))}
-          </div>
-          <button onClick={startPainting} disabled={loading} className="w-full h-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-blue-500/30 hover:scale-[1.02]">
-            {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
-            Approve & Illustrate
-          </button>
-          <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Full Book Illustration Value: ${parseInt(IMAGE_COST) * 23} {BASE_CURRENCY}</p>
-          <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-400 transition-colors">Edit Hero Details</button>
-        </div>
-      )}
-
-      {step === 3 && book && (
-        <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
-          {/* Check if we're in the painting phase (not all teaser images are done yet) */}
-          {(book.status === 'generating' || book.status === 'teaser_generating' ||
-            (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
-            // Show centralized loading animation when teaser images are being generated
-            <div className="py-20 text-center space-y-10">
-              <div className="relative w-48 h-48 mx-auto">
-                <div className="absolute inset-0 bg-pink-500/20 rounded-full animate-ping" />
-                <div className="relative bg-slate-900 border-4 border-pink-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
-                  <Palette className="animate-pulse text-pink-500 w-20 h-20" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
-                <p className="text-slate-400 text-lg font-medium">Generating {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} stunning AI illustrations...</p>
-              </div>
-              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
-                  style={{
-                    width: `${calculateProgress()}%`
-                  }}
-                />
-              </div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                Estimated Time: 2-3 Minutes
-              </p>
-            </div>
-          ) : book.status === 'teaser_ready' && calculateProgress() < 100 ? (
-            // Special case: if status is teaser_ready but progress is still < 100%, show loading
-            <div className="py-20 text-center space-y-10">
-              <div className="relative w-48 h-48 mx-auto">
-                <div className="absolute inset-0 bg-pink-500/20 rounded-full animate-ping" />
-                <div className="relative bg-slate-900 border-4 border-pink-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
-                  <Palette className="animate-pulse text-pink-500 w-20 h-20" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finishing Teaser Illustrations</h2>
-                <p className="text-slate-400 text-lg font-medium">Finalizing {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} teaser illustrations...</p>
-              </div>
-              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
-                  style={{
-                    width: `${calculateProgress()}%`
-                  }}
-                />
-              </div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                Almost Ready!
-              </p>
-            </div>
-          ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
-            // Show centralized loading animation when full book images are being generated after payment
-            <div className="py-20 text-center space-y-10">
-              <div className="relative w-48 h-48 mx-auto">
-                <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping" />
-                <div className="relative bg-slate-900 border-4 border-blue-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
-                  <Palette className="animate-pulse text-blue-500 w-20 h-20" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
-                <p className="text-slate-400 text-lg font-medium">Generating all {book.pages?.length || 23} illustrations for your full book...</p>
-              </div>
-              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-1000 ease-out"
-                  style={{
-                    width: `${calculateFullBookProgress()}%`
-                  }}
-                />
-              </div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                Estimated Time: 5-8 Minutes
-              </p>
-            </div>
-          ) : book.status === 'paid' && !book.pdfUrl ? (
-            // Show loading animation when PDF is being generated
-            <div className="py-20 text-center space-y-10">
-              <div className="relative w-48 h-48 mx-auto">
-                <div className="absolute inset-0 bg-amber-500/20 rounded-full animate-ping" />
-                <div className="relative bg-slate-900 border-4 border-amber-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
-                  <FileText className="animate-pulse text-amber-500 w-20 h-20" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
-                <p className="text-slate-400 text-lg font-medium">Assembling your beautifully illustrated book into a high-quality PDF...</p>
-              </div>
-              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000 ease-out"
-                  style={{
-                    width: '75%' // PDF generation is typically quick once images are ready
-                  }}
-                />
-              </div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                EST. TIME: 6-8 MINS
-              </p>
-            </div>
-          ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
-            // Show loading animation when PDF is being prepared for download
-            <div className="py-20 text-center space-y-10">
-              <div className="relative w-48 h-48 mx-auto">
-                <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
-                <div className="relative bg-slate-900 border-4 border-green-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
-                  <FileText className="animate-pulse text-green-500 w-20 h-20" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finalizing Your PDF</h2>
-                <p className="text-slate-400 text-lg font-medium">Your PDF is ready! Preparing download link...</p>
-              </div>
-              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-1000 ease-out"
-                  style={{
-                    width: '100%'
-                  }}
-                />
-              </div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                Almost Ready!
-              </p>
-            </div>
-          ) : book.status === 'printing' ? (
-            // Show loading animation when book is being printed
-            <div className="py-20 text-center space-y-10">
-              <div className="relative w-48 h-48 mx-auto">
-                <div className="absolute inset-0 bg-purple-500/20 rounded-full animate-ping" />
-                <div className="relative bg-slate-900 border-4 border-purple-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
-                  <Package className="animate-pulse text-purple-500 w-20 h-20" />
-                </div>
-              </div>
-              <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Printing Your Book</h2>
-                <p className="text-slate-400 text-lg font-medium">Your hardcover book is being professionally printed and will ship soon!</p>
-              </div>
-              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 ease-out"
-                  style={{
-                    width: '100%'
-                  }}
-                />
-              </div>
-              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                On Its Way To You!
-              </p>
-            </div>
-          ) : (
-            // Show the book preview with individual page placeholders
-            <>
-              <div className="text-center">
-                <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
-                <p className="text-slate-400 mt-4">We're painting the first {TEASER_LIMIT} pages for free!</p>
-              </div>
-
-              <div className="space-y-20">
-                {book.pages?.map((p: BookPage, i: number) => (
-                  <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
-                    <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
-                      {i < TEASER_LIMIT ? (
-                        p.imageUrl && !p.imageUrl.includes('placeholder') ? (
-                          <img
-                            key={p.imageUrl}
-                            src={p.imageUrl}
-                            className="w-full h-full object-cover"
-                            alt={`Page ${i + 1}`}
-                            onError={() => {
-                              console.error(`Failed to load image: ${p.imageUrl}`);
-                              // If image fails to load, it might be an expired signed URL
-                              // We can't easily trigger a single page refresh here without complex state,
-                              // but the poller will eventually get a new one.
-                              // For now, let's just log it.
-                            }}
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
-                            <Palette className="text-slate-700 w-12 h-12" />
-                            <p className="text-[10px] font-black uppercase text-slate-700 tracking-widest text-center px-8">AI is painting this page...</p>
-                          </div>
-                        )
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-700">
-                          <Lock size={48} />
-                          <p className="text-[10px] font-black uppercase tracking-widest">Order to Unlock Illustration</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg">
-                      <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
-            <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
-            <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
-
-            <div className="flex flex-col gap-4">
-              {book.pdfUrl && (
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => window.open(book.pdfUrl, '_blank')}
-                    className="w-full h-14 bg-slate-800 text-white rounded-xl font-bold text-lg border border-white/10 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                  >
-                    <ExternalLink size={20} />
-                    View Digital PDF
-                  </button>
-                  <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">Digital PDF Edition: ${PDF_COST} {BASE_CURRENCY}</p>
-                </div>
-              )}
-
-              <button
-                onClick={async () => {
-                  let currentUser = user;
-                  if (!currentUser) {
-                    toast({ title: "Login Required", description: "Please sign in to order your book!" });
-                    currentUser = await login();
-                    if (!currentUser) return; // User cancelled login
-                  }
-
-                  if (book && book.bookId && book.title) {
-                    createCheckoutSession(book.bookId, book.title, currentUser?.email);
-                  } else {
-                    toast({
-                      title: "Error",
-                      description: "Book information not available. Please try again.",
-                      variant: "destructive"
-                    });
-                  }
-                }}
-                disabled={checkoutLoading}
-                className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-              >
-                {checkoutLoading ? (
-                  <>
-                    <Loader2 className="animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Order Hardcover (${BOOK_COST} {BASE_CURRENCY})
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>

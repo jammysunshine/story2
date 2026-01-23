@@ -10,12 +10,14 @@ const { Storage } = require('@google-cloud/storage');
 const { OAuth2Client } = require('google-auth-library');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
-const { sendStoryEmail } = require('./mail');
 const { generateImages } = require('./imageService');
 const { generatePdf, get7DaySignedUrl } = require('./pdfService');
 const logger = require('./logger');
 
 dotenv.config();
+
+// Import mail module AFTER environment variables are loaded
+const { sendStoryEmail } = require('./mail');
 
 const app = express();
 
@@ -158,20 +160,17 @@ async function generateImageRace(prompt, bookId, pageNumber) {
 app.post('/api/auth/social', async (req, res) => {
   const { token, provider } = req.body;
   try {
-    let email, name;
+    const email = await getUserEmailFromToken(token);
+    if (!email) throw new Error('Could not resolve email from token');
 
-    // Support both ID Token (Capacitor) and Access Token (Web GSI)
-    if (token.length > 500) {
-      // Likely an ID Token
-      const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
-      const payload = ticket.getPayload();
-      email = payload.email;
-      name = payload.name;
-    } else {
-      // Likely an Access Token - fetch user info from Google
+    // Fetch user info from Google for name if it's an access token
+    let name = 'Adventurer';
+    if (token.length <= 500) {
       const userInfo = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
-      email = userInfo.data.email;
       name = userInfo.data.name;
+    } else {
+      const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
+      name = ticket.getPayload().name;
     }
 
     const user = await db.collection('users').findOneAndUpdate(
@@ -435,6 +434,23 @@ app.post('/api/generate-images', async (req, res) => {
   }
 });
 
+// Common helper for token verification
+async function getUserEmailFromToken(token) {
+  if (!token) return null;
+  if (token.length > 500) {
+    // ID Token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    return ticket.getPayload().email;
+  } else {
+    // Access Token
+    const userInfo = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
+    return userInfo.data.email;
+  }
+}
+
 app.get('/api/orders', async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -443,21 +459,14 @@ app.get('/api/orders', async (req, res) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
-    const payload = ticket.getPayload();
-    const email = payload.email;
-    logger.info(`🔍 [ORDER_FETCH] Fetching orders for email: ${email}`);
+    const email = await getUserEmailFromToken(token);
+    if (!email) throw new Error('Could not resolve email from token');
 
+    logger.info(`🔍 [ORDER_FETCH] Fetching orders for email: ${email}`);
     const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
-    logger.info(`🔍 [ORDER_FETCH] Found ${orders.length} orders for ${email}`);
     res.json({ success: true, orders });
   } catch (error) {
-    // MORE ROBUST LOGGING: Catch specific Google Auth errors or provide full context
-    const errorMsg = error.message || (typeof error === 'string' ? error : JSON.stringify(error));
-    logger.warn('Order fetch blocked (Invalid/Missing Token):', errorMsg);
+    logger.warn('Order fetch blocked (Invalid/Missing Token):', error.message);
     res.status(401).json({ error: 'Invalid token' });
   }
 });

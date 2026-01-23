@@ -5,13 +5,13 @@ const logger = require('./logger');
 async function triggerGelatoFulfillment(params) {
   const { bookId, pdfUrl, shippingAddress, db, orderReferenceId, currency = 'AUD' } = params;
   logger.info('🎯 [GELATO_V4] INITIATING FULFILLMENT', { bookId });
-  
+
   const isTestMode = process.env.GELATO_TEST_MODE !== 'false';
-  
+
   // FETCH BOOK TO GET PRECISE PAGE COUNT (with fillers)
   const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
   if (!book) throw new Error('Book not found for fulfillment');
-  
+
   const accuratePageCount = book.finalPageCount || 28; // Fallback to 28 minimum
 
   // --- PRIVACY VAULT: Generate a 24-hour signed URL for Gelato ---
@@ -20,7 +20,7 @@ async function triggerGelatoFulfillment(params) {
     try {
       const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
       const pdfBucketName = process.env.GCS_PDFS_BUCKET_NAME;
-      
+
       let filePath = '';
       try {
         const url = new URL(pdfUrl);
@@ -51,13 +51,13 @@ async function triggerGelatoFulfillment(params) {
 
   // --- STATE MAPPING: Convert full names to ISO codes for Gelato ---
   const stateMap = {
-    'new south wales': 'NSW', 'victoria': 'VIC', 'queensland': 'QLD', 'western australia': 'WA', 
+    'new south wales': 'NSW', 'victoria': 'VIC', 'queensland': 'QLD', 'western australia': 'WA',
     'south australia': 'SA', 'tasmania': 'TAS', 'australian capital territory': 'ACT', 'northern territory': 'NT',
     'california': 'CA', 'new york': 'NY', 'texas': 'TX', 'florida': 'FL', 'illinois': 'IL', 'pennsylvania': 'PA',
     'ohio': 'OH', 'georgia': 'GA', 'north carolina': 'NC', 'michigan': 'MI', 'ontario': 'ON', 'quebec': 'QC',
     'british columbia': 'BC', 'alberta': 'AB', 'manitoba': 'MB', 'saskatchewan': 'SK'
   };
-  
+
   const rawState = (shippingAddress.state || '').toLowerCase().trim();
   const normalizedState = stateMap[rawState] || shippingAddress.state;
 
@@ -146,7 +146,7 @@ async function triggerGelatoFulfillment(params) {
         $set: {
           gelatoOrderId: result.id,
           gelatoOrderStatus: result.fulfillmentStatus,
-          status: isTestMode ? 'printing_test' : 'printing',
+          status: 'printing',
           updatedAt: new Date()
         }
       }
