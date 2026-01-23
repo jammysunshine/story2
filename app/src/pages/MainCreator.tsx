@@ -854,7 +854,7 @@ export default function MainCreator() {
                 (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
                 // Show centralized loading animation when teaser images are being generated
                 <div className="py-20 text-center space-y-10">
-                  {console.log("DEBUG: Rendering teaser generation animation. Status:", book.status, "Progress:", calculateProgress())}
+                  {(() => { console.log("DEBUG: Rendering teaser generation animation. Status:", book.status, "Progress:", calculateProgress()); return null; })()}
                   <MagicGlow color="pink" />
                   <div className="space-y-4">
                     <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
@@ -895,7 +895,7 @@ export default function MainCreator() {
               ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
                 // Show centralized loading animation when full book images are being generated after payment
                 <div className="py-20 text-center space-y-10">
-                  {console.log("DEBUG: Rendering full book generation animation. Status:", book.status, "Full progress:", calculateFullBookProgress())}
+                  {(() => { console.log("DEBUG: Rendering full book generation animation. Status:", book.status, "Full progress:", calculateFullBookProgress()); return null; })()}
                   <MagicGlow color="blue" />
                   <div className="space-y-4">
                     <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
@@ -916,7 +916,7 @@ export default function MainCreator() {
               ) : book.status === 'paid' && !book.pdfUrl ? (
                 // Show loading animation when PDF is being generated
                 <div className="py-20 text-center space-y-10">
-                  {console.log("DEBUG: Rendering PDF generation animation. Status:", book.status, "PDF URL exists:", !!book.pdfUrl)}
+                  {(() => { console.log("DEBUG: Rendering PDF generation animation. Status:", book.status, "PDF URL exists:", !!book.pdfUrl); return null; })()}
                   <MagicGlow color="amber" />
                   <div className="space-y-4">
                     <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
