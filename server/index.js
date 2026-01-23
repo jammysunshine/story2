@@ -453,7 +453,9 @@ app.get('/api/orders', async (req, res) => {
     const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
     res.json({ success: true, orders });
   } catch (error) {
-    logger.error('Order fetch failed:', error.message);
+    // MORE ROBUST LOGGING: Catch specific Google Auth errors or provide full context
+    const errorMsg = error.message || (typeof error === 'string' ? error : JSON.stringify(error));
+    logger.warn('Order fetch blocked (Invalid/Missing Token):', errorMsg);
     res.status(401).json({ error: 'Invalid token' });
   }
 });
@@ -580,8 +582,9 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 
     // 2. Update Book Status
     const bookUpdate = {
-      status: type === 'digital' ? 'paid' : 'paid', // Both digital and physical go to 'paid' initially
+      status: type === 'digital' ? 'paid' : 'paid',
       isDigitalUnlocked: true,
+      userId: email, // ENSURE userId is set so emails can be sent later
       customerEmail: session.customer_details?.email,
       updatedAt: new Date()
     };

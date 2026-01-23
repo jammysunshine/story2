@@ -96,6 +96,17 @@ async function triggerGelatoFulfillment(params) {
   logger.info('📦 GELATO PAYLOAD AUDIT:', JSON.stringify(gelatoPayload, null, 2));
 
   try {
+    // Log detailed request information before sending
+    logger.debug('📤 DETAILED GELATO REQUEST:', {
+      url: 'https://order.gelatoapis.com/v4/orders',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-KEY': process.env.GELATO_API_KEY ? '[HIDDEN]' : '[MISSING]'
+      },
+      body: JSON.stringify(gelatoPayload, null, 2)
+    });
+
     const response = await fetch('https://order.gelatoapis.com/v4/orders', {
       method: 'POST',
       headers: {
@@ -106,11 +117,22 @@ async function triggerGelatoFulfillment(params) {
     });
 
     const result = await response.json();
+
+    // Log detailed response information
+    logger.debug('📥 DETAILED GELATO RESPONSE:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: JSON.stringify(result, null, 2)
+    });
+
     logger.info('📥 GELATO RESPONSE RECEIVED:', JSON.stringify(result, null, 2));
 
     if (!response.ok) {
       logger.error('❌ GELATO V4 API ERROR:', {
         status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
         data: JSON.stringify(result)
       });
       throw new Error(`Gelato v4 error: ${response.status} - ${JSON.stringify(result)}`);
@@ -132,7 +154,11 @@ async function triggerGelatoFulfillment(params) {
 
     return result;
   } catch (error) {
-    logger.error('❌ GELATO V4 FATAL ERROR:', error.message);
+    logger.error('❌ GELATO V4 FATAL ERROR:', {
+      message: error.message,
+      stack: error.stack,
+      bookId: bookId
+    });
     throw error;
   }
 }
