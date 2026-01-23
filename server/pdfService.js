@@ -5,7 +5,10 @@ const { PDFDocument, rgb } = require('pdf-lib');
 const crypto = require('crypto');
 const logger = require('./logger');
 
-const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
+const storage = new Storage({
+  projectId: process.env.GCP_PROJECT_ID,
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+});
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
 
@@ -21,7 +24,7 @@ async function get7DaySignedUrl(pdfUrl) {
     const pathParts = url.pathname.split('/').filter(Boolean);
     if (pathParts[0] === bucketName) pathParts.shift();
     const filePath = pathParts.join('/');
-    
+
     const [signedUrl] = await storage.bucket(bucketName).file(filePath).getSignedUrl({
       version: 'v4',
       action: 'read',
@@ -47,20 +50,20 @@ async function generatePdf(db, bookId) {
   logger.info(`🔍 [PDF_GEN_DEBUG] Project ID: "${projectId}"`);
   const imagesBucketName = process.env.GCS_IMAGES_BUCKET_NAME;
   const imagesBucket = storage.bucket(imagesBucketName);
-  
+
   const expectedImages = book.pages.length;
   let allImagesReady = false;
-  const maxWaitTime = (expectedImages / 10) * 120000; 
+  const maxWaitTime = (expectedImages / 10) * 120000;
   const pollInterval = 30000;
   let waited = 0;
 
   while (waited < maxWaitTime) {
     let readyCount = 0;
-    logger.info(`📡 Checking GCS for ${expectedImages} images (Waited ${waited/1000}s)...`);
+    logger.info(`📡 Checking GCS for ${expectedImages} images (Waited ${waited / 1000}s)...`);
 
     for (const page of book.pages) {
       let fileName = `books/${bookId}/page_${page.pageNumber}.png`;
-      
+
       if (page.type === 'photo' || page.pageNumber === 1) {
         const photoUrl = page.url || page.imageUrl || '';
         if (photoUrl.includes('storage.googleapis.com')) {
@@ -80,9 +83,9 @@ async function generatePdf(db, bookId) {
       const [exists] = await imagesBucket.file(fileName).exists();
       if (exists) {
         readyCount++;
+        // logger.debug(`✅ [PDF TRACE] Found image: P${page.pageNumber} at ${fileName}`);
       } else {
-        logger.error(`⏳ [PDF TRACE] MISSING IMAGE: P${page.pageNumber} at path: ${fileName}`);
-        readyCount = readyCount; // No change, but let's be explicit
+        logger.error(`❌ [PDF TRACE] MISSING IMAGE: P${page.pageNumber} at path: ${fileName}`);
       }
     }
 
@@ -101,8 +104,8 @@ async function generatePdf(db, bookId) {
     throw new Error('PDF Generation Aborted: Not all images were ready in time.');
   }
 
-  const chromePath = process.platform === 'darwin' 
-    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' 
+  const chromePath = process.platform === 'darwin'
+    ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
     : '/usr/bin/chromium';
 
   logger.info(`🔧 Using Chrome executable: ${chromePath}`);
@@ -124,7 +127,7 @@ async function generatePdf(db, bookId) {
   try {
     logger.info('✅ [PDF TRACE] Browser launched successfully');
     const page = await browser.newPage();
-    
+
     page.on('requestfailed', request => {
       logger.warn(`❌ [PDF RESOURCE FAIL] ${request.url()} - ${request.failure()?.errorText}`);
     });
@@ -147,7 +150,7 @@ async function generatePdf(db, bookId) {
 
     logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
     const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
-    
+
     await page.goto(fullTemplateUrl, {
       waitUntil: 'networkidle0',
       timeout: 120000
@@ -180,11 +183,11 @@ async function generatePdf(db, bookId) {
 
     for (let i = 0; i < totalActualPages; i++) {
       logger.info(`📄 Slicing page ${i + 1}/${totalActualPages}...`);
-      
+
       const pageInfo = await page.evaluate(async (index) => {
         const pages = document.querySelectorAll('.page');
         let currentImgInfo = { src: 'none', visible: false, complete: false, decoded: false, width: 0 };
-        
+
         for (let idx = 0; idx < pages.length; idx++) {
           const p = pages[idx];
           if (idx === index) {
@@ -213,7 +216,7 @@ async function generatePdf(db, bookId) {
         return { totalInDom: pages.length, img: currentImgInfo };
       }, i);
 
-      logger.info(`🎯 Slice ${i+1} Diagnostic:`, pageInfo);
+      logger.info(`🎯 Slice ${i + 1} Diagnostic:`, pageInfo);
 
       await sleep(500);
 
@@ -230,7 +233,7 @@ async function generatePdf(db, bookId) {
     if (mergedPdf.getPageCount() < GELATO_MIN_PAGES) {
       const fillerNeeded = GELATO_MIN_PAGES - mergedPdf.getPageCount();
       logger.info(`补充 [PDF TRACE] Adding ${fillerNeeded} filler pages to meet Gelato 28-page minimum.`);
-      
+
       const parchmentColor = rgb(1.0, 0.996, 0.961); // Matches #FFFEF5
 
       for (let f = 0; f < fillerNeeded; f++) {
@@ -257,7 +260,7 @@ async function generatePdf(db, bookId) {
     });
 
     const pdfUrl = `https://storage.googleapis.com/${process.env.GCS_PDFS_BUCKET_NAME}/${fileName}`;
-    
+
     await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
       { $set: { finalPageCount, pdfUrl, status: 'pdf_ready', updatedAt: new Date() } }
