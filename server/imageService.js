@@ -429,18 +429,21 @@ async function generateImages(db, bookId, isFulfillment = false) {
   await Promise.all(teaserIndices.map(idx => paintPageWithRetry(idx)));
   giLog.info(`✅ TEASER BATCH COMPLETE.`);
 
-  // Explicitly update status to teaser_ready so frontend knows to stop or show preview
-  giLog.info(`🎯 Setting status to teaser_ready for book: ${bookId}`);
-  await db.collection('books').updateOne(
-    { _id: new ObjectId(bookId) },
-    { $set: { status: 'teaser_ready', updatedAt: new Date() } }
-  );
+  // FIX: Only set status to teaser_ready if this is NOT a fulfillment run.
+  // If it IS a fulfillment run, keep the status as is (paid/processing) until the end.
+  if (!isFulfillment) {
+    giLog.info(`🎯 Setting status to teaser_ready for book: ${bookId}`);
+    await db.collection('books').updateOne(
+      { _id: new ObjectId(bookId) },
+      { $set: { status: 'teaser_ready', updatedAt: new Date() } }
+    );
+  }
 
   if (isFulfillment) {
     const regularIndices = masterPages.map((_, i) => i).filter(idx => idx >= teaserLimit);
     const BATCH_DELAY_MS = STORY_BATCH_DELAY_MS;
-    giLog.info(`🚀 FIRING REGULAR BATCHES with a ${BATCH_DELAY_MS / 1000}s fire-and-forget delay...`);
-    const BATCH_SIZE = 18;
+    const BATCH_SIZE = parseInt(process.env.STORY_IMAGE_CONCURRENCY || '18');
+    giLog.info(`🚀 FIRING REGULAR BATCHES (Size: ${BATCH_SIZE}) with a ${BATCH_DELAY_MS / 1000}s fire-and-forget delay...`);
     const allBatchPromises = [];
     for (let i = 0; i < regularIndices.length; i += BATCH_SIZE) {
       const chunk = regularIndices.slice(i, i + BATCH_SIZE);
