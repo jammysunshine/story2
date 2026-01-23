@@ -3,9 +3,9 @@ const { MongoClient, ObjectId } = require('mongodb');
 const { Storage } = require('@google-cloud/storage');
 const { generatePdf } = require('../pdfService');
 
-async function runFastAudit() {
+async function runDefinitiveAudit() {
   console.log('\n========================================================');
-  console.log('🚀 LIVE PROGRESS AUDIT ENGINE');
+  console.log('🕵️  DEFINITIVE STORAGE & DATABASE AUDIT');
   console.log('========================================================\n');
 
   const client = new MongoClient(process.env.MONGODB_URI, { 
@@ -14,87 +14,84 @@ async function runFastAudit() {
   });
 
   try {
-    console.log('📡 STEP 1: Connecting to MongoDB...');
     await client.connect();
     const db = client.db('story-db');
-    console.log('✅ Connected.');
+    console.log('✅ STEP 1: Connected to MongoDB (story-db)');
 
     const storage = new Storage({ projectId: process.env.GCP_PROJECT_ID });
     const bucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
     const userEmail = 'nidhi.cambridge@gmail.com';
 
-    console.log(`📡 STEP 2: Fetching book list for ${userEmail}...`);
-    // Use regex for case-insensitivity just in case
+    console.log(`✅ STEP 2: Fetching books for ${userEmail}...\n`);
     const books = await db.collection('books')
       .find({ userId: { $regex: new RegExp(userEmail, 'i') } })
-      .project({ _id: 1, title: 1, pages: 1 })
       .sort({ createdAt: -1 })
       .toArray();
 
-    if (books.length === 0) {
-      console.error('❌ No books found for this user.');
-      return;
-    }
+    console.log(`📊 Found ${books.length} books. Starting deep audit...\n`);
 
-    console.log(`✅ Found ${books.length} books. Starting granular audit...\n`);
-
-    for (let i = 0; i < books.length; i++) {
-      const book = books[i];
+    for (const book of books) {
       const bookId = book._id.toString();
+      console.log(`--------------------------------------------------------`);
+      console.log(`📖 AUDITING: "${book.title}"`);
+      console.log(`🆔 ID: ${bookId}`);
+      console.log(`--------------------------------------------------------`);
       
-      // LOG IMMEDIATELY
-      process.stdout.write(`[${i + 1}/${books.length}] Auditing: "${book.title}"... `);
-      
-      const pathsToCheck = [];
-      pathsToCheck.push({ pg: 2, path: `books/${bookId}/hero_reference.png` });
-      pathsToCheck.push({ pg: 3, path: `books/${bookId}/animal_reference.png` });
-      
-      // We check up to 28 pages
-      for (let p = 1; p <= 28; p++) {
-        if (p !== 2 && p !== 3) {
-          pathsToCheck.push({ pg: p, path: `books/${bookId}/page_${p}.png` });
+      let missingCount = 0;
+      let missingPages = [];
+
+      // We audit based on the ACTUAL pages array in the book
+      for (const page of book.pages) {
+        const pNum = page.pageNumber;
+        let fileName = `page_${pNum}.png`;
+        if (pNum === 2) fileName = `hero_reference.png`;
+        if (pNum === 3) fileName = `animal_reference.png`;
+
+        const primaryPath = `books/${bookId}/${fileName}`;
+        const backupPath = `images/${bookId}/${fileName}`;
+
+        // 1. Check GCS Storage (Primary)
+        const [existsPrimary] = await bucket.file(primaryPath).exists();
+        // 2. Check GCS Storage (Backup)
+        const [existsBackup] = await bucket.file(backupPath).exists();
+        // 3. Check MongoDB 'images' collection
+        const dbImage = await db.collection('images').findOne({ 
+          bookId: new ObjectId(bookId), 
+          pageNumber: pNum 
+        });
+
+        const isFound = existsPrimary || existsBackup;
+        const statusIcon = isFound ? '✅' : '❌';
+        const dbIcon = dbImage ? '✅' : '❌';
+
+        console.log(`[Page ${String(pNum).padStart(2, ' ')}] Storage: ${statusIcon} | DB Meta: ${dbIcon} | Path: ${isFound ? (existsPrimary ? primaryPath : backupPath) : primaryPath}`);
+
+        if (!isFound) {
+          missingCount++;
+          missingPages.push(pNum);
         }
       }
 
-      // Parallel GCS check for THIS book
-      const results = await Promise.all(pathsToCheck.map(async (item) => {
-        try {
-          const [exists] = await bucket.file(item.path).exists();
-          if (exists) return true;
-          // Check alternate location
-          const [existsAlt] = await bucket.file(item.path.replace('books/', 'images/')).exists();
-          return existsAlt;
-        } catch (e) {
-          return false;
-        }
-      }));
+      console.log(`\n📈 Audit Result: ${book.pages.length - missingCount}/${book.pages.length} images found.`);
 
-      const foundCount = results.filter(Boolean).length;
-      console.log(`${foundCount}/27 images.`);
-
-      if (foundCount >= 27) {
-        console.log(`\n🏆 FOUND COMPLETE BOOK!`);
-        console.log(`📖 Title: ${book.title}`);
-        console.log(`🆔 ID: ${bookId}`);
-        console.log(`🚀 STARTING PDF ENGINE NOW...`);
-        console.log('--------------------------------------------------------');
-        
+      if (missingCount === 0 && book.pages.length >= 27) {
+        console.log(`\n🏆 PERFECT MATCH! Book is complete.`);
+        console.log(`🚀 TRIGGERING PDF ENGINE...`);
         const pdfUrl = await generatePdf(db, bookId);
-        
-        console.log('\n✅ SUCCESS!');
-        console.log('🔗 URL: ' + pdfUrl);
-        console.log('========================================================\n');
+        console.log(`\n✅ PDF READY: ${pdfUrl}`);
         process.exit(0);
+      } else {
+        console.log(`⚠️  SKIPPING: Missing ${missingCount} images (${missingPages.join(', ')}).`);
       }
     }
 
     console.log('\n❌ AUDIT FINISHED: No 100% complete books found.');
 
   } catch (error) {
-    console.error('\n💥 ERROR:', error.message);
+    console.error('\n💥 SCRIPT ERROR:', error.message);
   } finally {
     await client.close();
   }
 }
 
-runFastAudit().catch(console.error);
+runDefinitiveAudit().catch(console.error);

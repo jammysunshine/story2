@@ -33,18 +33,18 @@ const options = {
   genders: ['Boy', 'Girl'],
   skinTones: ['Fair', 'Light', 'Medium', 'Tan', 'Deep'],
   hairStyles: [
-    'Short', 'Long', 'Curly', 'Wavy', 'Straight', 'Braids', 'Bald', 
+    'Short', 'Long', 'Curly', 'Wavy', 'Straight', 'Braids', 'Bald',
     'Pigtails', 'Ponytail', 'Bun', 'Bob cut', 'Pixie cut', 'Afro', 'Space buns'
   ],
   hairColors: ['Black', 'Brown', 'Blonde', 'Red', 'Gray', 'White'],
   styles: [
-    'Studio Ghibli style', 'Disney-inspired 3D render', 'Classic watercolor', 
-    'Pixar character design', 'Hayao Miyazaki illustration', 'Papercut art', 
+    'Studio Ghibli style', 'Disney-inspired 3D render', 'Classic watercolor',
+    'Pixar character design', 'Hayao Miyazaki illustration', 'Papercut art',
     'Oil painting style', 'Chalk drawing'
   ],
   locations: [
     'Magical Forest', 'Deep Ocean', 'Outer Space', 'Castle', 'Dinosaur Jungle',
-    'Jungle', 'Mountain', 'Desert', 'Garden', 'Village', 'Zoo', 
+    'Jungle', 'Mountain', 'Desert', 'Garden', 'Village', 'Zoo',
     'Underwater City', 'Cloud Kingdom', 'Ice Palace', 'Magical Library'
   ]
 }
@@ -136,9 +136,9 @@ export default function MainCreator() {
   useEffect(() => {
     const isWeb = Capacitor.getPlatform() === 'web';
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    
+
     console.warn(`🔍 AUTH CHECK: Platform=${Capacitor.getPlatform()}, ClientID=${clientId ? '✅' : '❌'}`);
-    
+
     // ONLY initialize the Capacitor plugin on Native (iOS/Android)
     if (!isWeb && clientId) {
       GoogleAuth.initialize({
@@ -156,21 +156,21 @@ export default function MainCreator() {
       // Auto-fetch orders for returning user
       fetchOrders(parsedUser.token);
     }
-    
+
     const savedBook = localStorage.getItem('book');
     if (savedBook) {
       const parsedBook = JSON.parse(savedBook);
       setBook(parsedBook);
       console.warn('📖 Restored Book:', parsedBook.bookId);
     }
-    
+
     const savedStep = localStorage.getItem('step');
     if (savedStep) {
       const parsedStep = parseInt(savedStep);
       setStep(parsedStep);
       console.warn('📍 Restored Step:', parsedStep);
     }
-    
+
     // 2. LOCK HYDRATION (Wait a frame to ensure state is restored before persistence wakes up)
     setTimeout(() => {
       isHydrated.current = true;
@@ -201,26 +201,26 @@ export default function MainCreator() {
           const client = (window as any).google.accounts.oauth2.initTokenClient({
             client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
             scope: 'email profile',
-                      callback: (resp: any) => {
-                        if (resp.error) {
-                          console.error('❌ GSI Error:', resp.error);
-                          return reject(resp);
-                        }
-                        console.warn('📡 Token received from Web Engine');
-                        resolve(resp.access_token);
-                      },
-                    });
-                    client.requestAccessToken();
-                  });
-                } else {
-                  // --- NATIVE ENGINE (Capacitor Plugin) ---
-                  const googleUser = await GoogleAuth.signIn();
-                  console.warn('📡 Token received from Native Engine');
-                  token = googleUser.authentication.idToken;
-                }
-            
-                console.warn('📡 Sending token to backend for verification...');
-                const res = await axios.post(`${API_URL}/auth/social`, { token, provider: 'google' });      
+            callback: (resp: any) => {
+              if (resp.error) {
+                console.error('❌ GSI Error:', resp.error);
+                return reject(resp);
+              }
+              console.warn('📡 Token received from Web Engine');
+              resolve(resp.access_token);
+            },
+          });
+          client.requestAccessToken();
+        });
+      } else {
+        // --- NATIVE ENGINE (Capacitor Plugin) ---
+        const googleUser = await GoogleAuth.signIn();
+        console.warn('📡 Token received from Native Engine');
+        token = googleUser.authentication.idToken;
+      }
+
+      console.warn('📡 Sending token to backend for verification...');
+      const res = await axios.post(`${API_URL}/auth/social`, { token, provider: 'google' });
       if (res.data.success) {
         const userData = { ...res.data.user, token };
         setUser(userData);
@@ -238,10 +238,10 @@ export default function MainCreator() {
   const logout = async () => {
     console.warn('🚿 Logging out...');
     const isWeb = Capacitor.getPlatform() === 'web';
-    
+
     try {
       if (!isWeb) {
-        await GoogleAuth.signOut().catch(() => {});
+        await GoogleAuth.signOut().catch(() => { });
       }
     } catch (err) {
       // Ignore provider errors
@@ -281,7 +281,7 @@ export default function MainCreator() {
 
   const [orders, setOrders] = useState<Order[]>([])
   const [ordersLoading, setOrdersLoading] = useState(false)
-  
+
   const [formData, setFormData] = useState<FormData>({
     childName: 'Emma',
     age: '5',
@@ -321,7 +321,7 @@ export default function MainCreator() {
   useEffect(() => {
     console.warn('--- POLLING USEEFFECT TRIGGERED ---');
     console.warn('Current Step:', step, 'Book ID:', book?.bookId);
-    
+
     // Cleanup any existing interval before starting a new one
     if (pollingRef.current) {
       console.warn('🧹 Cleaning up old zombie poller');
@@ -331,14 +331,14 @@ export default function MainCreator() {
 
     if (step === 3 && book?.bookId) {
       console.warn('✅ Polling condition MET. Starting loop.');
-      
+
       const poll = async () => {
         console.log('--- POLLER TICK ---');
         try {
           const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
           const newStatus = res.data.status;
           const newPages = res.data.pages || [];
-          
+
           // SAFETY: If API returns empty pages for a book we know should have pages, ABORT
           if (newPages.length === 0 && bookRef.current?.pages && bookRef.current.pages.length > 0) {
             console.warn('⚠️ API returned 0 pages for existing book. Ignoring to prevent UI collapse.');
@@ -351,7 +351,7 @@ export default function MainCreator() {
             if (!prev) return null;
 
             const prevPaintedCount = prev.pages?.filter((p: BookPage) => p.imageUrl && !p.imageUrl.includes('placeholder')).length || 0;
-            
+
             // CRITICAL: Prevent "downgrade" regression
             // If new count is LESS than what we have, REJECT it unless status changed significantly
             if (newPaintedCount < prevPaintedCount && newStatus !== 'preview') {
@@ -363,7 +363,7 @@ export default function MainCreator() {
               console.warn(`✨ Updating UI: ${prevPaintedCount} -> ${newPaintedCount} images. Status: ${newStatus}`);
               return { ...prev, status: newStatus, pages: [...newPages] };
             }
-            
+
             return prev;
           });
 
@@ -484,7 +484,7 @@ export default function MainCreator() {
       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">{label}</label>
       <select
         value={formData[field]}
-        onChange={e => setFormData({...formData, [field]: e.target.value})}
+        onChange={e => setFormData({ ...formData, [field]: e.target.value })}
         className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm border border-transparent focus:border-primary/30 transition-all shadow-sm focus:shadow-lg focus:shadow-primary/10"
       >
         {choices.map(c => <option key={c} value={c}>{c}</option>)}
@@ -503,51 +503,51 @@ export default function MainCreator() {
             <>
               <LibraryDropdown user={user} />
               <Sheet onOpenChange={(open) => open && fetchOrders()}>
-              <SheetTrigger asChild>
-                <button className="p-2 bg-slate-800 rounded-xl border border-white/5 relative hover:bg-slate-700/50 transition-colors">
-                  <Package size={18} />
-                  {orders.length > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />}
-                </button>
-              </SheetTrigger>
-              <SheetContent side="right" className="bg-slate-900 border-white/5 text-white w-full sm:max-w-md z-[100]">
-                <SheetHeader className="pb-6 border-b border-white/5">
-                  <SheetTitle className="text-white font-black uppercase flex items-center gap-2">
-                    <Package className="text-primary" /> Your Orders
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="py-6 space-y-4 overflow-y-auto max-h-[80vh]">
-                  {ordersLoading ? (
-                    <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
-                  ) : orders.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 font-bold uppercase text-xs tracking-widest">No orders yet</div>
-                  ) : (
-                    orders.map((order) => (
-                      <div key={order._id} className="bg-slate-800/50 p-5 rounded-2xl border border-white/5 space-y-3">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-black text-sm uppercase tracking-tight">Hardcover Book</h4>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt).toLocaleDateString()}</p>
+                <SheetTrigger asChild>
+                  <button className="p-2 bg-slate-800 rounded-xl border border-white/5 relative hover:bg-slate-700/50 transition-colors">
+                    <Package size={18} />
+                    {orders.length > 0 && <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />}
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="right" className="bg-slate-900 border-white/5 text-white w-full sm:max-w-md z-[100]">
+                  <SheetHeader className="pb-6 border-b border-white/5">
+                    <SheetTitle className="text-white font-black uppercase flex items-center gap-2">
+                      <Package className="text-primary" /> Your Orders
+                    </SheetTitle>
+                  </SheetHeader>
+                  <div className="py-6 space-y-4 overflow-y-auto max-h-[80vh]">
+                    {ordersLoading ? (
+                      <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
+                    ) : orders.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 font-bold uppercase text-xs tracking-widest">No orders yet</div>
+                    ) : (
+                      orders.map((order) => (
+                        <div key={order._id} className="bg-slate-800/50 p-5 rounded-2xl border border-white/5 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-black text-sm uppercase tracking-tight">Hardcover Book</h4>
+                              <p className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${order.status === 'Shipped' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500 animate-pulse'
+                              }`}>
+                              {order.status}
+                            </span>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${
-                            order.status === 'Shipped' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500 animate-pulse'
-                          }`}>
-                            {order.status}
-                          </span>
+                          <div className="flex justify-between items-end">
+                            <p className="font-black text-primary text-lg">${order.amount.toFixed(2)}</p>
+                            {order.trackingUrl && (
+                              <a href={order.trackingUrl} target="_blank" className="flex items-center gap-1 text-[10px] font-black text-blue-400 hover:underline">
+                                TRACKING <ExternalLink size={10} />
+                              </a>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex justify-between items-end">
-                          <p className="font-black text-primary text-lg">${order.amount.toFixed(2)}</p>
-                          {order.trackingUrl && (
-                            <a href={order.trackingUrl} target="_blank" className="flex items-center gap-1 text-[10px] font-black text-blue-400 hover:underline">
-                              TRACKING <ExternalLink size={10} />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
+                      ))
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </>
           )}
           {user ? (
             <div className="flex items-center gap-3">
@@ -578,18 +578,17 @@ export default function MainCreator() {
             {/* Magic Photo Scan */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${
-                photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
-              } hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] transition-transform`}
+              className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
+                } hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] transition-transform`}
             >
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handlePhotoUpload} 
-                className="hidden" 
-                accept="image/*" 
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handlePhotoUpload}
+                className="hidden"
+                accept="image/*"
               />
-              
+
               {isUploading ? (
                 <div className="flex flex-col items-center">
                   <Loader2 className="animate-spin text-primary mb-4" size={32} />
@@ -602,7 +601,7 @@ export default function MainCreator() {
                   </div>
                   <h4 className="text-sm font-black text-green-400 uppercase tracking-widest mb-1">Magic Link Established</h4>
                   <p className="text-[10px] text-slate-500 font-bold uppercase">Character will sync with this photo</p>
-                  <button 
+                  <button
                     onClick={(e) => { e.stopPropagation(); setPhotoUrl(''); }}
                     className="mt-4 text-[8px] font-black uppercase text-red-400 hover:text-red-500 transition-colors flex items-center gap-1"
                   >
@@ -610,24 +609,24 @@ export default function MainCreator() {
                   </button>
                 </div>
               ) : (
-                 <>
-                   <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-white/5">
-                     <Camera className="text-slate-400 group-hover:text-primary transition-colors" size={32} />
-                   </div>
-                   <h4 className="text-lg font-black text-white uppercase tracking-widest mb-2">Magic Photo Scan</h4>
-                   <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed max-w-[200px]">Upload a photo to sync your child's features with the AI character.</p>
-                   <Badge variant="outline" className="mt-4 border-amber-500/30 text-amber-500 text-[8px] font-black uppercase bg-amber-500/5">Enable Character Sync</Badge>
-                 </>
+                <>
+                  <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-white/5">
+                    <Camera className="text-slate-400 group-hover:text-primary transition-colors" size={32} />
+                  </div>
+                  <h4 className="text-lg font-black text-white uppercase tracking-widest mb-2">Magic Photo Scan</h4>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed max-w-[200px]">Upload a photo to sync your child's features with the AI character.</p>
+                  <Badge variant="outline" className="mt-4 border-amber-500/30 text-amber-500 text-[8px] font-black uppercase bg-amber-500/5">Enable Character Sync</Badge>
+                </>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
-                <input value={formData.childName} onChange={e => setFormData({...formData, childName: e.target.value})} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
+                <input value={formData.childName} onChange={e => setFormData({ ...formData, childName: e.target.value })} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
               </div>
-              
-              {renderSelect('Age', 'age', ['3','4','5','6','7','8','9','10'])}
+
+              {renderSelect('Age', 'age', ['3', '4', '5', '6', '7', '8', '9', '10'])}
               {renderSelect('Gender', 'gender', options.genders)}
               {renderSelect('Skin Tone', 'skinTone', options.skinTones)}
               {renderSelect('Hair Style', 'hairStyle', options.hairStyles)}
@@ -681,7 +680,7 @@ export default function MainCreator() {
             <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
             <p className="text-slate-400 mt-4">We're painting the first {TEASER_LIMIT} pages for free!</p>
           </div>
-          
+
           <div className="space-y-20">
             {book.pages?.map((p: BookPage, i: number) => (
               <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
@@ -692,7 +691,7 @@ export default function MainCreator() {
                         key={p.imageUrl}
                         src={p.imageUrl}
                         className="w-full h-full object-cover"
-                        alt={`Page ${i+1}`}
+                        alt={`Page ${i + 1}`}
                         onError={() => {
                           console.error(`Failed to load image: ${p.imageUrl}`);
                           // If image fails to load, it might be an expired signed URL
@@ -724,7 +723,7 @@ export default function MainCreator() {
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
             <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
             <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
-            
+
             <div className="flex flex-col gap-4">
               {book.pdfUrl && (
                 <div className="flex flex-col gap-2">
@@ -747,7 +746,7 @@ export default function MainCreator() {
                     currentUser = await login();
                     if (!currentUser) return; // User cancelled login
                   }
-                  
+
                   if (book && book.bookId && book.title) {
                     createCheckoutSession(book.bookId, book.title);
                   } else {

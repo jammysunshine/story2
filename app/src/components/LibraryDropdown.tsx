@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Book, ChevronDown, Download, Eye, Loader2, Trash2, ShoppingCart, CheckCircle2, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { Book, ChevronDown, Download, Eye, Loader2, Trash2, ShoppingCart, CheckCircle2, Image as ImageIcon, ExternalLink, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useToast } from "../hooks/use-toast";
@@ -29,7 +29,7 @@ export function LibraryDropdown({ user }: { user: any }) {
       const res = await axios.get(`${API_URL}/orders`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
-      
+
       // ENHANCEMENT: Fetch thumbnails and titles for each order
       const ordersWithData = await Promise.all((res.data.orders || []).map(async (order: any) => {
         try {
@@ -55,7 +55,7 @@ export function LibraryDropdown({ user }: { user: any }) {
   const handleDownload = async (bookId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (generatingId) return;
-    
+
     setGeneratingId(bookId);
     toast({
       title: "Preparing PDF",
@@ -117,7 +117,7 @@ export function LibraryDropdown({ user }: { user: any }) {
                 <span>Recent Adventures</span>
                 {loading && <Loader2 size={12} className="animate-spin text-primary" />}
               </div>
-              
+
               <div className="max-h-[32rem] overflow-y-auto custom-scrollbar">
                 {books.length === 0 ? (
                   <div className="p-10 text-center text-slate-500 italic text-xs font-bold uppercase tracking-widest">No stories yet</div>
@@ -135,7 +135,7 @@ export function LibraryDropdown({ user }: { user: any }) {
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between items-start gap-2 mb-1">
                             <div className="font-black text-white text-sm line-clamp-1 truncate">{order.bookTitle || 'Storybook'}</div>
@@ -146,16 +146,16 @@ export function LibraryDropdown({ user }: { user: any }) {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-2">
-                        <button 
+                        <button
                           onClick={() => loadBookDetails(order.bookId, 'story')}
                           className="flex items-center justify-center gap-1.5 py-2 bg-slate-800 border border-white/5 rounded-lg text-[9px] font-black text-slate-300 hover:text-white hover:bg-slate-700 transition-all uppercase"
                         >
                           <Eye size={12} /> View
                         </button>
-                        <button 
-                          onClick={(e) => handleDownload(order.bookId, e)} 
+                        <button
+                          onClick={(e) => handleDownload(order.bookId, e)}
                           disabled={!!generatingId}
                           className="flex items-center justify-center gap-1.5 py-2 bg-primary/10 border border-primary/20 rounded-lg text-[9px] font-black text-primary hover:bg-primary/20 transition-all uppercase"
                         >
@@ -195,10 +195,10 @@ export function LibraryDropdown({ user }: { user: any }) {
               </div>
             ))}
           </div>
-          
+
           <div className="p-8 bg-slate-900/80 backdrop-blur-xl border-t border-white/5 flex justify-center items-center gap-6">
-            <button 
-              onClick={(e) => handleDownload(selectedBook?.id, e)} 
+            <button
+              onClick={(e) => handleDownload(selectedBook?.id, e)}
               disabled={!!generatingId}
               className="px-10 py-4 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl hover:scale-105 transition-all flex items-center gap-3 active:scale-95"
             >
