@@ -647,6 +647,23 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     // 2. Trigger PDF generation (Now safe because images are done)
     logger.info(`📄 Triggering PDF generation for: ${bookId}`);
 
+    // FETCH LATEST BOOK TO CHECK FOR PLACEHOLDERS BEFORE PDF OR PRINTING
+    const bookRecordCheck = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+    const placeholders = bookRecordCheck?.pages?.filter((p) =>
+      !p.imageUrl ||
+      p.imageUrl.includes('via.placeholder.com') ||
+      p.imageUrl.includes('placeholder.png') ||
+      p.imageUrl.includes('Painting+Page')
+    );
+
+    if (placeholders && placeholders.length > 0) {
+      logger.error('🚨 [FULFILLMENT ERROR] Book contains placeholder images. Retrying painting...');
+      // Re-trigger painting once more
+      await generateImages(db, bookId, true);
+      // Wait a bit more
+      await new Promise(r => setTimeout(r, 30000));
+    }
+
     // Internal call should always hit the local Express port
     const internalUrl = `http://localhost:3001`;
     const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
@@ -664,43 +681,14 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     const { pdfUrl } = await pdfResponse.json();
     logger.info(`✅ PDF generated successfully: ${pdfUrl}`);
 
-    // 3. FETCH LATEST BOOK TO CHECK FOR PLACEHOLDERS BEFORE PRINTING
-    const bookRecord = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
-
-    const placeholders = bookRecord?.pages?.filter((p) =>
-      !p.imageUrl ||
-      p.imageUrl.includes('via.placeholder.com') ||
-      p.imageUrl.includes('placeholder.png') ||
-      p.imageUrl.includes('Painting+Page')
-    );
-
-    const hasPlaceholders = placeholders && placeholders.length > 0;
-
-    if (hasPlaceholders) {
-      logger.error('🚨🚨🚨 [CRITICAL FULFILLMENT ERROR] 🚨🚨🚨');
-      logger.error(`Book ${bookId} contains MISSING or PLACEHOLDER IMAGES.`);
-      logger.error('Missing Pages Summary:', placeholders.map((p) => ({
-        pageNumber: p.pageNumber,
-        urlPreview: p.imageUrl?.substring(0, 50) || 'NULL'
-      })));
-      logger.error('GELATO PRINTING ABORTED to prevent printing a defective book.');
-      logger.error('Manual intervention required: Regenerate missing images and trigger printing manually.');
-
-      await db.collection('books').updateOne(
-        { _id: new ObjectId(bookId) },
-        { $set: { status: 'fulfillment_error', error: 'Book contains placeholder images. Printing aborted.' } }
-      );
-      return;
-    }
-
-    // 4. Trigger Gelato fulfillment ONLY for physical books
+    // 3. Trigger Gelato fulfillment ONLY for physical books
     if (type === 'book') {
       const { triggerGelatoFulfillment } = require('./fulfillmentService');
 
       await triggerGelatoFulfillment({
         bookId,
         pdfUrl,
-        shippingAddress: orderData.shippingAddress, // Use the shipping address from orderData
+        shippingAddress: orderData.shippingAddress,
         db,
         orderReferenceId: `${bookId}-${session.id.slice(-6)}`,
         currency: session.currency?.toUpperCase() || 'AUD'
@@ -711,16 +699,20 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
       logger.info('✨ [FULFILLMENT] Digital order complete. PDF is ready.');
 
       // For digital orders, send PDF ready email
-      if (email) {
+      const customerEmail = orderData.shippingAddress.email || session.customer_details?.email;
+      if (customerEmail) {
         const { sendStoryEmail } = require('./mail');
+        const { get7DaySignedUrl } = require('./pdfService');
         const signedUrl = await get7DaySignedUrl(pdfUrl);
-        logger.info(`🔗 [DIGITAL_FULFILLMENT] Generated signed link: ${signedUrl.substring(0, 100)}...`);
-        logger.info(`📡 [DIGITAL_FULFILLMENT] Attempting to send email to: ${email}`);
+        
+        logger.info(`📡 [DIGITAL_FULFILLMENT] Sending email to: ${customerEmail}`);
         try {
-          await sendStoryEmail(email, bookRecord.title || 'Your Digital Storybook', signedUrl);
-          logger.info(`✅ [DIGITAL_FULFILLMENT] SUCCESS! Email sent to ${email}`);
+          // Fetch book title fresh
+          const currentBook = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+          await sendStoryEmail(customerEmail, currentBook?.title || 'Your Digital Storybook', signedUrl);
+          logger.info(`✅ [DIGITAL_FULFILLMENT] SUCCESS! Email sent.`);
         } catch (emailError) {
-          logger.error(`❌ [DIGITAL_FULFILLMENT] FAILED to send email to ${email}: ${emailError.message}`);
+          logger.error(`❌ [DIGITAL_FULFILLMENT] FAILED: ${emailError.message}`);
         }
       }
     }

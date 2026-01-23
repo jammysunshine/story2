@@ -91,9 +91,13 @@ async function generatePdf(db, bookId) {
       break;
     }
 
-    logger.warn(`⏳ Only ${readyCount}/${expectedImages} images ready. Sleeping...`);
+    logger.warn(`⏳ Only ${readyCount}/${expectedImages} images ready. Sleeping 30s...`);
     await sleep(pollInterval);
     waited += pollInterval;
+  }
+
+  if (!allImagesReady) {
+    throw new Error('PDF Generation Aborted: Not all images were ready in time.');
   }
 
   const chromePath = process.platform === 'darwin' 
