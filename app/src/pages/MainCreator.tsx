@@ -517,7 +517,7 @@ export default function MainCreator() {
               <button onClick={logout} className="text-[10px] font-black text-slate-500 uppercase hover:text-red-400 transition-colors hover:underline">Logout</button>
             </div>
           ) : (
-            <button onClick={login} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30 hover:scale-[1.02]">Login</button>
+            <button onClick={async () => { await login(); }} className="bg-primary px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-all hover:shadow-primary/30 hover:scale-[1.02]">Login</button>
           )}
         </div>
       </header>
