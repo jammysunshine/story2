@@ -4,6 +4,10 @@ const config: CapacitorConfig = {
   appId: 'com.aistorytime.app',
   appName: 'AI Storytime',
   webDir: 'dist',
+  server: {
+    cleartext: true,
+    allowNavigation: ['10.202.14.197']
+  },
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],

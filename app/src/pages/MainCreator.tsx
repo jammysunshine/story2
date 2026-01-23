@@ -18,7 +18,7 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 
 //console.warn('⚠️⚠️⚠️ MAIN CREATOR FILE LOADED AT:', new Date().toLocaleTimeString());
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://10.202.14.197:3001/api'
 const TEASER_LIMIT = parseInt(import.meta.env.VITE_STORY_TEASER_PAGES_COUNT || '7');
 
 // Pricing Constants for UI Display

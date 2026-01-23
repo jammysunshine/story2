@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star, BookOpen, Sparkles, User as CircleUser, FileText } from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://10.202.14.197:3001/api';
 
 export default function SuccessPage() {
   const [searchParams] = useSearchParams();
@@ -25,9 +25,13 @@ export default function SuccessPage() {
     window.location.href = '/';
   };
 
-  const MagicGlow = ({ color = 'amber' }: { color?: 'amber' }) => {
+  const MagicGlow = ({ color = 'pink' }: { color?: 'pink' | 'amber' | 'blue' | 'purple' | 'green' }) => {
     const colorMap: Record<string, string> = {
-      amber: 'from-amber-600/50 to-orange-600/50 border-amber-600/70'
+      pink: 'from-pink-600/50 to-rose-600/50 border-pink-600/70',
+      amber: 'from-amber-600/50 to-orange-600/50 border-amber-600/70',
+      blue: 'from-blue-600/50 to-indigo-600/50 border-blue-600/70',
+      purple: 'from-purple-600/50 to-indigo-600/50 border-purple-600/70',
+      green: 'from-green-600/50 to-emerald-600/50 border-green-600/70'
     };
 
     return (
@@ -58,7 +62,7 @@ export default function SuccessPage() {
         <div className={`absolute inset-0 bg-gradient-to-tr ${colorMap[color]} rounded-full blur-3xl animate-magic-glow-2`} />
         <div className={`absolute inset-0 bg-gradient-to-tr ${colorMap[color]} rounded-full blur-xl animate-magic-glow-1`} />
         <div className={`relative bg-slate-900/90 backdrop-blur-md border-4 ${colorMap[color].split(' ').pop()} w-full h-full rounded-full flex items-center justify-center shadow-[0_0_80px_rgba(0,0,0,0.7)] animate-magic-pulse`}>
-          <FileText className="text-white w-20 h-20 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]" />
+          <BookOpen className="text-white w-20 h-20 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]" />
         </div>
       </div>
     );
@@ -218,7 +222,7 @@ export default function SuccessPage() {
         <div className="flex flex-col items-center gap-10 mt-16 pb-20">
           {!pdfUrl ? (
             <div className="w-full max-w-md text-center space-y-8">
-              <MagicGlow color="amber" />
+              <MagicGlow color="pink" />
               <div className="space-y-4">
                 <p className="text-xl font-black text-white uppercase tracking-wider">Crafting Your PDF</p>
                 <p className="text-sm text-slate-400">Assembling your beautifully illustrated book into a high-quality PDF...</p>

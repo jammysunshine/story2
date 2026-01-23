@@ -1,4 +1,19 @@
-# React + TypeScript + Vite
+## Mobile Development (Android)
+
+To run the app on a physical Android device and connect to your local backend:
+
+1. **Start the Backend**: Run `npm start` in the `server` directory (Port 3001).
+2. **Connect Phone**: Ensure your phone is connected via USB or Wi-Fi Debugging.
+3. **Establish Bridge**: In the `app` directory, run:
+   ```bash
+   npm run bridge
+   ```
+   *This tunnels the phone's `localhost:3001` requests to your Mac.*
+4. **Run App**: Open Android Studio and click the **Green Play** button.
+
+---
+
+## React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

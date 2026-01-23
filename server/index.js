@@ -64,9 +64,14 @@ app.use((req, res, next) => {
   if (req.originalUrl === '/api/webhook') next();
   else express.json({ limit: '10mb' })(req, res, next);
 });
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
+app.use((req, res, next) => { console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url} from ${req.ip}`); next(); });
 
-const port = process.env.PORT || 3001;
+const port = process.env.PORT || 3005;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
@@ -254,10 +259,11 @@ app.post('/api/generate-story', async (req, res) => {
     logger.info(`🛡️ Anti-Creepy Rule: friendly expression, large expressive eyes, no distorted features`);
     logger.info('🎨 ====================================================');
 
-    // Use the new API key for story generation
-    const storyGenAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY_P || process.env.GOOGLE_API_KEY);
+    // Use the new API key for story generation to avoid rate limiting on original key
+    // Use gemini-2.0-flash-exp model which may have better availability
+    const storyGenAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY_P);
     const model = storyGenAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.0-flash-exp",
       generationConfig: {
         maxOutputTokens: 8192,
         temperature: 0.8,
@@ -764,7 +770,7 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     }
 
     // Internal call should always hit the local Express port
-    const internalUrl = `http://localhost:3001`;
+    const internalUrl = `http://localhost:3005`;
     const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
       method: 'POST',
       headers: {
@@ -852,7 +858,7 @@ app.post('/api/create-checkout', async (req, res) => {
 });
 
 connectDB().then(() => {
-  app.listen(port, () => {
+  app.listen(port, '0.0.0.0', () => {
     logger.info(`🚀 Engine Server running at http://localhost:${port}`);
   });
 }).catch(err => {
