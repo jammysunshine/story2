@@ -386,9 +386,9 @@ export default function MainCreator() {
 
           // Stop polling if we reached a final state
           // NOTE: We don't stop on 'paid' anymore since full image generation and PDF generation happen after payment
-          // We continue polling if status is 'pdf_ready' but pdfUrl is not yet available
-          if (['preview', 'illustrated', 'printing', 'teaser_ready'].includes(newStatus) ||
-              (newStatus === 'pdf_ready' && bookRef.current?.pdfUrl)) {
+          // We continue polling if status is 'teaser_ready' but images are not fully loaded yet
+          if (['preview', 'illustrated', 'printing', 'pdf_ready'].includes(newStatus) ||
+              (newStatus === 'teaser_ready' && calculateProgress() === 100)) {
             console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
             if (pollingRef.current) {
               clearInterval(pollingRef.current);
@@ -697,7 +697,8 @@ export default function MainCreator() {
       {step === 3 && book && (
         <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
           {/* Check if we're in the painting phase (not all teaser images are done yet) */}
-          {book.status !== 'teaser_ready' && calculateProgress() < 100 ? (
+          {(book.status === 'generating' || book.status === 'teaser_generating' ||
+            (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
             // Show centralized loading animation when teaser images are being generated
             <div className="py-20 text-center space-y-10">
               <div className="relative w-48 h-48 mx-auto">
@@ -720,6 +721,31 @@ export default function MainCreator() {
               </div>
               <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
                 Estimated Time: 2-3 Minutes
+              </p>
+            </div>
+          ) : book.status === 'teaser_ready' && calculateProgress() < 100 ? (
+            // Special case: if status is teaser_ready but progress is still < 100%, show loading
+            <div className="py-20 text-center space-y-10">
+              <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-pink-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 border-4 border-pink-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
+                  <Palette className="animate-pulse text-pink-500 w-20 h-20" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finishing Teaser Illustrations</h2>
+                <p className="text-slate-400 text-lg font-medium">Finalizing {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} teaser illustrations...</p>
+              </div>
+              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
+                  style={{
+                    width: `${calculateProgress()}%`
+                  }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                Almost Ready!
               </p>
             </div>
           ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
@@ -757,8 +783,8 @@ export default function MainCreator() {
                 </div>
               </div>
               <div className="space-y-4">
-                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your PDF</h2>
-                <p className="text-slate-400 text-lg font-medium">Assembling your beautifully illustrated book into a PDF...</p>
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
+                <p className="text-slate-400 text-lg font-medium">Assembling your beautifully illustrated book into a high-quality PDF...</p>
               </div>
               <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
                 <div
@@ -769,7 +795,7 @@ export default function MainCreator() {
                 />
               </div>
               <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                Estimated Time: 1-2 Minutes
+                EST. TIME: 6-8 MINS
               </p>
             </div>
           ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
