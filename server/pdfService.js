@@ -53,7 +53,7 @@ async function generatePdf(db, bookId) {
 
   const expectedImages = book.pages.length;
   let allImagesReady = false;
-  const maxWaitTime = (expectedImages / 10) * 120000;
+  const maxWaitTime = (expectedImages / 2) * 120000; // Allow 1 min per image on average, total ~13m for 27 pages
   const pollInterval = 30000;
   let waited = 0;
 

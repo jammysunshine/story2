@@ -8,6 +8,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify configuration on boot
+if (!process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+  console.warn('⚠️ WARNING: SMTP credentials missing. PDF emails will fail to send.');
+}
+
 async function sendStoryEmail(email, bookTitle, pdfUrl) {
   // Use the PDF ready template for consistency with story1
   const html = getPdfReadyTemplate(

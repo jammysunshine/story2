@@ -597,16 +597,12 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
 
     // 2. Update Book Status
     const bookUpdate = {
-      status: type === 'digital' ? 'paid' : 'paid',
+      status: 'paid', // All orders start as 'paid' to trigger image generation first
       isDigitalUnlocked: true,
       userId: email, // ENSURE userId is set so emails can be sent later
       customerEmail: session.customer_details?.email,
       updatedAt: new Date()
     };
-
-    if (type === 'digital') {
-      bookUpdate.status = 'pdf_ready'; // Digital orders go straight to pdf_ready
-    }
 
     await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
@@ -683,11 +679,20 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     );
 
     if (placeholders && placeholders.length > 0) {
-      logger.error('🚨 [FULFILLMENT ERROR] Book contains placeholder images. Retrying painting...');
-      // Re-trigger painting once more
+      logger.error(`🚨 [FULFILLMENT ERROR] Book ${bookId} contains ${placeholders.length} placeholders. Retrying painting...`);
+      // Re-trigger painting once more and wait
       await generateImages(db, bookId, true);
-      // Wait a bit more
-      await new Promise(r => setTimeout(r, 30000));
+
+      // Check again after retry
+      const bookRecordRecheck = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+      const remainingPlaceholders = bookRecordRecheck?.pages?.filter((p) =>
+        !p.imageUrl || p.imageUrl.includes('placeholder') || p.imageUrl.includes('Painting+Page')
+      );
+
+      if (remainingPlaceholders && remainingPlaceholders.length > 0) {
+        logger.error(`❌ [FULFILLMENT HALT] Book ${bookId} still has ${remainingPlaceholders.length} missing images. Aborting PDF generation.`);
+        return; // Stop here to prevent generating a broken PDF
+      }
     }
 
     // Internal call should always hit the local Express port

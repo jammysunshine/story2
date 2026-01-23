@@ -483,7 +483,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
     if (isFulfillment) {
       const regularIndices = masterPages.map((_, i) => i).filter(idx => idx >= teaserLimit);
       const BATCH_DELAY_MS = STORY_BATCH_DELAY_MS;
-      const BATCH_SIZE = parseInt(process.env.STORY_IMAGE_CONCURRENCY || '18');
+      const BATCH_SIZE = parseInt(process.env.STORY_IMAGE_CONCURRENCY || '30');
       giLog.info(`🚀 FIRING REGULAR BATCHES (Size: ${BATCH_SIZE}) with a ${BATCH_DELAY_MS / 1000}s fire-and-forget delay...`);
       const allBatchPromises = [];
       for (let i = 0; i < regularIndices.length; i += BATCH_SIZE) {
