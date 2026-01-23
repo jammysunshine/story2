@@ -67,7 +67,7 @@ const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
-const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'story-db-v2';
+const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'story-db';
 const MONGODB_TIMEOUT_MS = parseInt(process.env.MONGODB_TIMEOUT_MS || '90000');
 
 const STORY_COST = parseInt(process.env.STORY_COST || '10');
@@ -157,17 +157,31 @@ async function generateImageRace(prompt, bookId, pageNumber) {
 app.post('/api/auth/social', async (req, res) => {
   const { token, provider } = req.body;
   try {
-    const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
-    const payload = ticket.getPayload();
+    let email, name;
+
+    // Support both ID Token (Capacitor) and Access Token (Web GSI)
+    if (token.length > 500) {
+      // Likely an ID Token
+      const ticket = await googleClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
+      const payload = ticket.getPayload();
+      email = payload.email;
+      name = payload.name;
+    } else {
+      // Likely an Access Token - fetch user info from Google
+      const userInfo = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
+      email = userInfo.data.email;
+      name = userInfo.data.name;
+    }
+
     const user = await db.collection('users').findOneAndUpdate(
-      { email: payload.email },
-      { $set: { name: payload.name, lastLogin: new Date() }, $setOnInsert: { createdAt: new Date() } },
+      { email: email.toLowerCase() },
+      { $set: { name, lastLogin: new Date() }, $setOnInsert: { createdAt: new Date() } },
       { upsert: true, returnDocument: 'after' }
     );
-    logger.info(`👤 User Logged In: ${payload.email}`);
+    logger.info(`👤 User Logged In: ${email}`);
     res.json({ success: true, user: user.value || user });
   } catch (err) { 
-    logger.error('Auth failure');
+    logger.error('Auth failure:', err.message);
     res.status(500).json({ error: 'Auth failed' });
   }
 });

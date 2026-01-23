@@ -128,13 +128,16 @@ export default function MainCreator() {
   const { createCheckoutSession, loading: checkoutLoading } = useCheckout();
 
   useEffect(() => {
-    // Immediate initialization for Google Auth
+    // Standard initialization for Google Auth Web
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    console.warn('🔍 AUTH CHECK: Client ID in memory:', clientId ? '✅ FOUND' : '❌ MISSING (RESTART VITE)');
+    
     if (clientId) {
       GoogleAuth.initialize({
         clientId: clientId,
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
+        autoSelect: false,
       });
     }
 
@@ -162,26 +165,53 @@ export default function MainCreator() {
 
   const login = async () => {
     try {
-      const googleUser = await GoogleAuth.signIn();
-      const idToken = googleUser.authentication.idToken;
+      console.warn('🗝️ Attempting Google Sign-In (Web Engine)...');
       
-      const res = await axios.post(`${API_URL}/auth/social`, {
-        token: idToken,
-        provider: 'google'
+      return new Promise((resolve, reject) => {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        
+        if (!(window as any).google) {
+          console.error('❌ Google Library not loaded');
+          reject(new Error('Google Library not loaded'));
+          return;
+        }
+
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'email profile',
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse.error) {
+              reject(tokenResponse);
+              return;
+            }
+            
+            console.warn('📡 Token received, verifying with backend...');
+            try {
+              // We use the access_token here as it's the most reliable for web popups
+              const res = await axios.post(`${API_URL}/auth/social`, {
+                token: tokenResponse.access_token,
+                provider: 'google'
+              });
+              
+              if (res.data.success) {
+                const userData = { ...res.data.user, token: tokenResponse.access_token };
+                setUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData));
+                toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
+                resolve(userData);
+              }
+            } catch (err) {
+              console.error('Backend verification failed', err);
+              reject(err);
+            }
+          },
+        });
+        client.requestAccessToken();
       });
-      
-      if (res.data.success) {
-        // Store both user profile and token
-        const userData = { ...res.data.user, token: idToken };
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        toast({ title: "Welcome back!", description: `Logged in as ${res.data.user.name}` });
-        return userData; // Return for chaining
-      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       console.error('Login failed', err);
-      toast({ title: "Login Failed", description: errorMessage || "Could not sign in with Google", variant: "destructive" });
+      toast({ title: "Login Failed", description: "Could not sign in with Google", variant: "destructive" });
     }
     return null;
   };
