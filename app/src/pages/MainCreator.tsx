@@ -217,11 +217,19 @@ export default function MainCreator() {
   };
 
   const logout = async () => {
-    await GoogleAuth.signOut();
+    console.warn('🚿 Attempting Logout...');
+    try {
+      // Try to sign out from Google, but don't let it block us if it fails
+      await GoogleAuth.signOut().catch(e => console.warn('Google signOut skipped/failed:', e));
+    } catch (err) {
+      console.warn('Logout handshake error (ignoring):', err);
+    }
+
+    // ALWAYS clear local state regardless of Google's response
     setUser(null);
     localStorage.removeItem('user');
-    localStorage.removeItem('book');
-    localStorage.removeItem('step');
+    console.warn('✅ Local user state cleared.');
+    toast({ title: "Logged out", description: "You have been signed out safely." });
   };
 
   const [photoUrl, setPhotoUrl] = useState('')

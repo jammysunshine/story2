@@ -1,37 +1,17 @@
-import { MongoClient, ObjectId } from 'mongodb';
-import path from 'path';
-import 'dotenv/config';
+// TypeScript version of the script
+const { MongoClient, ObjectId } = require('mongodb');
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-const BOOK_ID = '6971e7f777734bddea0fcca8'; // The specific book ID
-const USER_EMAIL = 'nidhi.cambridge@gmail.com'; // The user to allocate to
-const MONGODB_URI = process.env.MONGODB_URI || 'REPLACE_WITH_YOUR_MONGODB_URI';
+const BOOK_ID: string = '6971e7f777734bddea0fcca8'; // The specific book ID
+const USER_EMAIL: string = 'nidhi.cambridge@gmail.com'; // The user to allocate to
+const MONGODB_URI: string = process.env.MONGODB_URI || 'REPLACE_WITH_YOUR_MONGODB_URI';
 
-interface Book {
-  _id: ObjectId;
-  title: string;
-  pages: Array<{ imageUrl?: string }>;
-  createdAt: Date;
-  [key: string]: any;
-}
 
-interface RecentBookEntry {
-  id: string;
-  title: string;
-  thumbnailUrl: string;
-  status: string;
-  isDigitalUnlocked: boolean;
-  createdAt: Date;
-}
 
-interface User {
-  email: string;
-  recentBooks?: RecentBookEntry[];
-  updatedAt: Date;
-}
-
-async function transferBooks() {
+async function transferBooks(): Promise<void> {
   console.log('Starting transfer script...');
-  const client = new MongoClient(MONGODB_URI, { family: 4, serverSelectionTimeoutMS: 60000, connectTimeoutMS: 60000 });
+  const client: MongoClient = new MongoClient(MONGODB_URI, { family: 4, serverSelectionTimeoutMS: 60000, connectTimeoutMS: 60000 });
   console.log('MongoClient created');
 
   try {
@@ -43,6 +23,11 @@ async function transferBooks() {
     const dbV2 = client.db('story-db-v2');
     const dbMain = client.db('story-db');
     console.log('Got DB references: v2=', dbV2.databaseName, 'main=', dbMain.databaseName);
+
+    // Create index if needed
+    console.log('Creating index on story-db-v2 books collection...');
+    await dbV2.collection('books').createIndex({ _id: 1 });
+    console.log('Index created.');
 
     // Count books in story-db-v2
     console.log('Counting books in story-db-v2...');
@@ -57,13 +42,13 @@ async function transferBooks() {
     // Transfer using cursor
     console.log(`Transferring books from story-db-v2 to story-db and allocating to ${USER_EMAIL}...`);
     console.log('Creating cursor...');
-    const cursor = dbV2.collection('books').find({});
+    const cursor = dbV2.collection('books').find({}).limit(21);
     console.log('Cursor created');
     let processed = 0;
     console.log('Starting while loop...');
     while (await cursor.hasNext()) {
       console.log('Cursor has next, calling next...');
-      const book = await cursor.next() as Book;
+      const book = await cursor.next();
       processed++;
       console.log(`Processing book ${processed}: ${book.title}`);
 
@@ -75,7 +60,7 @@ async function transferBooks() {
       }
 
       // Create new book object with userId
-      const newBook: Book = {
+      const newBook = {
         ...book,
         _id: new ObjectId(), // New ID to avoid conflicts
         userId: USER_EMAIL,
@@ -88,7 +73,7 @@ async function transferBooks() {
       await dbMain.collection('books').insertOne(newBook);
 
       // Sync to user's recentBooks
-      const recentBookEntry: RecentBookEntry = {
+      const recentBookEntry = {
         id: newBook._id.toString(),
         title: book.title,
         thumbnailUrl: book.pages[0]?.imageUrl || '',
@@ -98,7 +83,7 @@ async function transferBooks() {
       };
 
       await dbMain.collection('users').updateOne(
-        { email: USER_EMAIL } as any,
+        { email: USER_EMAIL },
         {
           $set: { updatedAt: new Date() },
           $push: {
@@ -125,5 +110,3 @@ async function transferBooks() {
 }
 
 transferBooks();
-
-export { transferBooks };

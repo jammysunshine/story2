@@ -58,6 +58,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const upload = multer({ storage: multer.memoryStorage() });
 app.use((req, res, next) => {
+  res.header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
   if (req.originalUrl === '/api/webhook') next();
   else express.json({ limit: '10mb' })(req, res, next);
 });
