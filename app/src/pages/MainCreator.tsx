@@ -12,6 +12,7 @@ import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
 import { useToast } from "../hooks/use-toast"
 import { useCheckout } from "../hooks/useCheckout";
+import { LibraryDropdown } from "../components/LibraryDropdown";
 
 import { Capacitor } from '@capacitor/core'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
@@ -499,7 +500,9 @@ export default function MainCreator() {
         </h1>
         <div className="flex items-center gap-3">
           {user && (
-            <Sheet onOpenChange={(open) => open && fetchOrders()}>
+            <>
+              <LibraryDropdown user={user} />
+              <Sheet onOpenChange={(open) => open && fetchOrders()}>
               <SheetTrigger asChild>
                 <button className="p-2 bg-slate-800 rounded-xl border border-white/5 relative hover:bg-slate-700/50 transition-colors">
                   <Package size={18} />
