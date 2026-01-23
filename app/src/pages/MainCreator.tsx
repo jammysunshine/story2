@@ -135,7 +135,6 @@ export default function MainCreator() {
     console.warn(`🔍 AUTH CHECK: Platform=${Capacitor.getPlatform()}, ClientID=${clientId ? '✅' : '❌'}`);
     
     // ONLY initialize the Capacitor plugin on Native (iOS/Android)
-    // On Web, we use the GSI script in index.html directly
     if (!isWeb && clientId) {
       GoogleAuth.initialize({
         clientId: clientId,
@@ -145,11 +144,24 @@ export default function MainCreator() {
 
     // 1. RESTORE STATE
     const savedUser = localStorage.getItem('user');
-    if (savedUser) setUser(JSON.parse(savedUser));
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+      console.warn('👤 Restored User:', JSON.parse(savedUser).email);
+    }
+    
     const savedBook = localStorage.getItem('book');
-    if (savedBook) setBook(JSON.parse(savedBook));
+    if (savedBook) {
+      const parsedBook = JSON.parse(savedBook);
+      setBook(parsedBook);
+      console.warn('📖 Restored Book:', parsedBook.bookId);
+    }
+    
     const savedStep = localStorage.getItem('step');
-    if (savedStep) setStep(parseInt(savedStep || '1'));
+    if (savedStep) {
+      const parsedStep = parseInt(savedStep);
+      setStep(parsedStep);
+      console.warn('📍 Restored Step:', parsedStep);
+    }
     
     // 2. LOCK HYDRATION (Wait a frame to ensure state is restored before persistence wakes up)
     setTimeout(() => {
@@ -181,19 +193,26 @@ export default function MainCreator() {
           const client = (window as any).google.accounts.oauth2.initTokenClient({
             client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
             scope: 'email profile',
-            callback: (resp: any) => resp.error ? reject(resp) : resolve(resp.access_token),
-          });
-          client.requestAccessToken();
-        });
-      } else {
-        // --- NATIVE ENGINE (Capacitor Plugin) ---
-        const googleUser = await GoogleAuth.signIn();
-        token = googleUser.authentication.idToken;
-      }
-
-      console.warn('📡 Verifying token with backend...');
-      const res = await axios.post(`${API_URL}/auth/social`, { token, provider: 'google' });
-      
+                      callback: (resp: any) => {
+                        if (resp.error) {
+                          console.error('❌ GSI Error:', resp.error);
+                          return reject(resp);
+                        }
+                        console.warn('📡 Token received from Web Engine');
+                        resolve(resp.access_token);
+                      },
+                    });
+                    client.requestAccessToken();
+                  });
+                } else {
+                  // --- NATIVE ENGINE (Capacitor Plugin) ---
+                  const googleUser = await GoogleAuth.signIn();
+                  console.warn('📡 Token received from Native Engine');
+                  token = googleUser.authentication.idToken;
+                }
+            
+                console.warn('📡 Sending token to backend for verification...');
+                const res = await axios.post(`${API_URL}/auth/social`, { token, provider: 'google' });      
       if (res.data.success) {
         const userData = { ...res.data.user, token };
         setUser(userData);
