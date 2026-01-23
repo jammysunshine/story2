@@ -461,8 +461,15 @@ app.get('/api/book-status', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     const securedPages = await Promise.all((book.pages || []).map(async p => ({ ...p, imageUrl: await getSignedUrl(p.imageUrl) })));
+    
+    let signedPdfUrl = null;
+    if (book.pdfUrl) {
+      const { get7DaySignedUrl } = require('./pdfService');
+      signedPdfUrl = await get7DaySignedUrl(book.pdfUrl);
+    }
+
     console.log(`[DEBUG] /api/book-status for ${bookId}: status=${book.status}, pagesWithImages=${securedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length}`);
-    res.json({ status: book.status, pages: securedPages, pdfUrl: await get7DaySignedUrl(book.pdfUrl) });
+    res.json({ status: book.status, pages: securedPages, pdfUrl: signedPdfUrl });
   } catch (error) {
     logger.error(`Error in /api/book-status: ${error.message}`);
     res.status(500).json({ error: error.message });
