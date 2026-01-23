@@ -143,6 +143,7 @@ export default function MainCreator() {
       });
     }
 
+    // 1. RESTORE STATE
     const savedUser = localStorage.getItem('user');
     if (savedUser) setUser(JSON.parse(savedUser));
     const savedBook = localStorage.getItem('book');
@@ -150,9 +151,11 @@ export default function MainCreator() {
     const savedStep = localStorage.getItem('step');
     if (savedStep) setStep(parseInt(savedStep || '1'));
     
-    // Mark as hydrated so we can start saving
-    isHydrated.current = true;
-    console.warn('💎 Hydration Complete: state restored from memory');
+    // 2. LOCK HYDRATION (Wait a frame to ensure state is restored before persistence wakes up)
+    setTimeout(() => {
+      isHydrated.current = true;
+      console.warn('💎 Hydration Complete: state restored from memory');
+    }, 100);
   }, []);
 
   useEffect(() => {
@@ -171,7 +174,6 @@ export default function MainCreator() {
 
     try {
       let token;
-      
       if (isWeb) {
         // --- WEB ENGINE (GSI) ---
         token = await new Promise((resolve, reject) => {
@@ -309,6 +311,13 @@ export default function MainCreator() {
           const res = await axios.get(`${API_URL}/book-status?bookId=${book.bookId}`);
           const newStatus = res.data.status;
           const newPages = res.data.pages || [];
+          
+          // SAFETY: If API returns empty pages for a book we know should have pages, ABORT
+          if (newPages.length === 0 && book.pages && book.pages.length > 0) {
+            console.warn('⚠️ API returned 0 pages for existing book. Ignoring to prevent UI collapse.');
+            return;
+          }
+
           const newPaintedCount = newPages.filter((p: BookPage) => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
 
           setBook((prev: Book | null) => {
