@@ -254,7 +254,9 @@ app.post('/api/generate-story', async (req, res) => {
     logger.info(`🛡️ Anti-Creepy Rule: friendly expression, large expressive eyes, no distorted features`);
     logger.info('🎨 ====================================================');
 
-    const model = genAI.getGenerativeModel({
+    // Use the new API key for story generation
+    const storyGenAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY_P || process.env.GOOGLE_API_KEY);
+    const model = storyGenAI.getGenerativeModel({
       model: "gemini-2.0-flash",
       generationConfig: {
         maxOutputTokens: 8192,
@@ -313,8 +315,8 @@ app.post('/api/generate-story', async (req, res) => {
     logger.info('🌐 ===============================================');
 
     let storyData;
-    const maxRetries = parseInt(process.env.MAX_RETRY_ATTEMPTS || '5');
-    const retryDelay = parseInt(process.env.IMAGE_GENERATION_DELAY_MS || '15000');
+    const maxRetries = parseInt(process.env.STORY_GEN_MAX_RETRIES || '5'); // Increased to 5 retries for story generation
+    const retryDelay = parseInt(process.env.STORY_GEN_DELAY_MS || '15000'); // Using story-specific delay
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -436,18 +438,36 @@ app.post('/api/generate-images', async (req, res) => {
 
 // Common helper for token verification
 async function getUserEmailFromToken(token) {
-  if (!token) return null;
-  if (token.length > 500) {
-    // ID Token
-    const ticket = await googleClient.verifyIdToken({
-      idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID
-    });
-    return ticket.getPayload().email;
-  } else {
-    // Access Token
-    const userInfo = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
-    return userInfo.data.email;
+  if (!token) {
+    logger.debug('Token validation: No token provided');
+    return null;
+  }
+
+  logger.debug(`Token validation: Processing token of length ${token.length}, starts with: ${token.substring(0, 20)}...`);
+
+  try {
+    if (token.length > 500) {
+      // ID Token
+      logger.debug('Token validation: Treating as ID token');
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      const email = ticket.getPayload().email;
+      logger.debug(`Token validation: Successfully extracted email from ID token: ${email}`);
+      return email;
+    } else {
+      // Access Token
+      logger.debug('Token validation: Treating as Access token');
+      const userInfo = await axios.get(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`);
+      const email = userInfo.data.email;
+      logger.debug(`Token validation: Successfully extracted email from Access token: ${email}`);
+      return email;
+    }
+  } catch (error) {
+    logger.warn(`Token validation failed for token starting with: ${token.substring(0, 20)}... Error: ${error.message}`);
+    logger.debug(`Token validation error details:`, error);
+    return null; // Return null instead of throwing to allow graceful degradation
   }
 }
 
@@ -458,16 +478,21 @@ app.get('/api/orders', async (req, res) => {
   }
 
   const token = authHeader.split(' ')[1];
-  try {
-    const email = await getUserEmailFromToken(token);
-    if (!email) throw new Error('Could not resolve email from token');
+  logger.debug(`Order fetch attempt with token starting: ${token.substring(0, 20)}...`);
+  const email = await getUserEmailFromToken(token);
+  if (!email) {
+    logger.warn('Order fetch blocked (Invalid/Missing Token): Could not resolve email from token');
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  logger.debug(`Order fetch: Successfully authenticated user with email: ${email}`);
 
+  try {
     logger.info(`🔍 [ORDER_FETCH] Fetching orders for email: ${email}`);
     const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
     res.json({ success: true, orders });
   } catch (error) {
-    logger.warn('Order fetch blocked (Invalid/Missing Token):', error.message);
-    res.status(401).json({ error: 'Invalid token' });
+    logger.error('Error fetching orders:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -479,10 +504,15 @@ app.get('/api/user/library', async (req, res) => {
   }
 
   const token = authHeader.split(' ')[1];
-  try {
-    const email = await getUserEmailFromToken(token);
-    if (!email) throw new Error('Could not resolve email from token');
+  logger.debug(`Library fetch attempt with token starting: ${token.substring(0, 20)}...`);
+  const email = await getUserEmailFromToken(token);
+  if (!email) {
+    logger.warn('Library fetch blocked (Invalid/Missing Token): Could not resolve email from token');
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  logger.debug(`Library fetch: Successfully authenticated user with email: ${email}`);
 
+  try {
     logger.info(`📚 [LIBRARY_FETCH] Fetching books for email: ${email}`);
     const books = await db.collection('books').find({
       $or: [
@@ -494,8 +524,8 @@ app.get('/api/user/library', async (req, res) => {
     logger.info(`📚 [LIBRARY_FETCH] Found ${books.length} books for ${email}`);
     res.json({ success: true, books });
   } catch (error) {
-    logger.warn('Library fetch blocked (Invalid/Missing Token):', error.message);
-    res.status(401).json({ error: 'Invalid token' });
+    logger.error('Error fetching library:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
