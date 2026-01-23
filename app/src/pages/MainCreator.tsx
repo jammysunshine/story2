@@ -129,16 +129,17 @@ export default function MainCreator() {
   const { createCheckoutSession, loading: checkoutLoading } = useCheckout();
 
   useEffect(() => {
-    // Standard initialization for Google Auth Web
+    const isWeb = Capacitor.getPlatform() === 'web';
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    console.warn('🔍 AUTH CHECK: Client ID in memory:', clientId ? '✅ FOUND' : '❌ MISSING (RESTART VITE)');
     
-    if (clientId) {
+    console.warn(`🔍 AUTH CHECK: Platform=${Capacitor.getPlatform()}, ClientID=${clientId ? '✅' : '❌'}`);
+    
+    // ONLY initialize the Capacitor plugin on Native (iOS/Android)
+    // On Web, we use the GSI script in index.html directly
+    if (!isWeb && clientId) {
       GoogleAuth.initialize({
         clientId: clientId,
         scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
-        autoSelect: false,
       });
     }
 

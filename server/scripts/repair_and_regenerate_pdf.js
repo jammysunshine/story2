@@ -36,7 +36,8 @@ async function repairAndRegenerate() {
     console.log('✅ Cleared old PDF URL from database.');
 
     // 3. Trigger the PDF generation API
-    const baseUrl = process.env.APP_URL || 'http://localhost:3001';
+    // ALWAYS use the backend port (3001) for this script, regardless of APP_URL
+    const baseUrl = 'http://localhost:3001';
     console.log(`📡 Triggering regeneration at: ${baseUrl}/api/generate-pdf`);
     
     const response = await fetch(`${baseUrl}/api/generate-pdf`, {
