@@ -284,7 +284,8 @@ async function generateImages(db, bookId, isFulfillment = false) {
         giLog.warn(`⚠️ [${type.toUpperCase()}_RACE] Batch ${raceAttempt + 1} failed: ${raceError.message}`);
         raceAttempt++;
         const isOverloaded = raceError.message?.includes('503') || raceError.message?.includes('MODEL_OVERLOADED');
-        const wait = isOverloaded ? 15000 : 150000;
+        // FIX: Use a much smaller wait time (10-15s) instead of 150s
+        const wait = isOverloaded ? 15000 : 10000;
         giLog.info(`⏳ [${type.toUpperCase()}_RACE] Waiting ${wait/1000}s before next batch...`);
         await new Promise(resolve => setTimeout(resolve, wait));
       }

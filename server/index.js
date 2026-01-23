@@ -68,6 +68,7 @@ const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'story-db-v2';
+const MONGODB_TIMEOUT_MS = parseInt(process.env.MONGODB_TIMEOUT_MS || '90000');
 
 const STORY_COST = parseInt(process.env.STORY_COST || '10');
 const IMAGE_COST = parseInt(process.env.IMAGE_COST || '2');
@@ -83,7 +84,11 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 let db;
 
 async function connectDB() {
-  const client = new MongoClient(process.env.MONGODB_URI, { family: 4 });
+  const client = new MongoClient(process.env.MONGODB_URI, { 
+    family: 4,
+    serverSelectionTimeoutMS: MONGODB_TIMEOUT_MS,
+    connectTimeoutMS: MONGODB_TIMEOUT_MS
+  });
   await client.connect();
   db = client.db(MONGODB_DB_NAME);
   logger.info(`✅ Connected to MongoDB Database: ${MONGODB_DB_NAME}`);

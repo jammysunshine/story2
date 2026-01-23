@@ -21,25 +21,27 @@ async function allocateUnallocatedBooks() {
     console.log('Got DB reference');
 
     // Count unallocated books
+    console.log('Counting unallocated books...');
     const totalCount = await db.collection('books').countDocuments({ userId: null });
-    console.log(`Found ${totalCount} unallocated books. Allocating to ${USER_EMAIL}...`);
+    console.log(`Count completed: ${totalCount} unallocated books. Allocating to ${USER_EMAIL}...`);
 
     if (totalCount === 0) {
       console.log('No unallocated books found.');
       return;
     }
 
-    // Get all unallocated books
-    const unallocatedBooks = await db.collection('books').find({ userId: null }).limit(1).toArray();
-    console.log(`Loaded ${unallocatedBooks.length} books into memory`);
-
-    // Process sequentially
-    for (let i = 0; i < unallocatedBooks.length; i++) {
-      const book = unallocatedBooks[i];
+    // Process one by one using cursor
+    console.log('Starting cursor processing...');
+    const cursor = db.collection('books').find({ userId: null }).limit(19);
+    let processed = 0;
+    while (await cursor.hasNext()) {
+      const book = await cursor.next();
+      processed++;
       const bookId = book._id.toString();
-      console.log(`Processing book ${i + 1}/${unallocatedBooks.length}: ${bookId} - ${book.title}`);
+      console.log(`Processing book ${processed}: ${bookId} - ${book.title}`);
 
       // Update the book
+      console.log(`Updating book ${bookId}...`);
       const result = await db.collection('books').updateOne(
         { _id: book._id },
         {
@@ -51,9 +53,9 @@ async function allocateUnallocatedBooks() {
           }
         }
       );
-
-      console.log(`Update result for ${bookId}:`, result);
+      console.log(`Update completed for ${bookId}:`, result);
     }
+    console.log('All processing completed.');
 
     console.log('All unallocated books allocated successfully.');
 

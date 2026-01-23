@@ -128,15 +128,14 @@ export default function MainCreator() {
   const { createCheckoutSession, loading: checkoutLoading } = useCheckout();
 
   useEffect(() => {
-    // Correctly initialize GoogleAuth with the Client ID for Web
+    // Immediate initialization for Google Auth
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (clientId) {
       GoogleAuth.initialize({
         clientId: clientId,
         scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
       });
-    } else {
-      console.error('❌ Google Client ID is missing in frontend environment!');
     }
 
     const savedUser = localStorage.getItem('user');
