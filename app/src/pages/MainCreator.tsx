@@ -443,9 +443,9 @@ export default function MainCreator() {
           });
 
           // Stop polling if we reached a final state
-          // NOTE: We don't stop on 'paid' anymore since full image generation and PDF generation happen after payment
-          // We continue polling if status is 'teaser_ready' but images are not fully loaded yet
-          if (['preview', 'illustrated', 'printing', 'printing_test', 'pdf_ready'].includes(newStatus) ||
+          // NOTE: We don't stop on 'paid', 'preview', or 'generating' anymore since image generation happens after these statuses
+          // We continue polling during image generation phases
+          if (['illustrated', 'printing', 'printing_test', 'pdf_ready'].includes(newStatus) ||
             (newStatus === 'teaser_ready' && calculateProgress() === 100)) {
             console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
             if (pollingRef.current) {
@@ -850,7 +850,7 @@ export default function MainCreator() {
           {step === 3 && book && (
             <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
               {/* Check if we're in the painting phase (not all teaser images are done yet) */}
-              {(book.status === 'generating' || book.status === 'teaser_generating' ||
+              {(book.status === 'generating' || book.status === 'teaser_generating' || book.status === 'preview' ||
                 (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
                 // Show centralized loading animation when teaser images are being generated
                 <div className="py-20 text-center space-y-10">
