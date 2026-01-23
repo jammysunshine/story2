@@ -4,5 +4,5 @@
     <string name="title_activity_main">AI Storytime</string>
     <string name="package_name">com.aistorytime.app</string>
     <string name="custom_url_scheme">com.aistorytime.app</string>
-    <string name="google_client_id">959069445137-ka5n2b0h3ruljb39lhviagf498dsg648.apps.googleusercontent.com</string>
+    <string name="google_client_id">959069445137-gkhoemnhsk3tr11eh2c8utfvih05fkpl.apps.googleusercontent.com</string>
 </resources>

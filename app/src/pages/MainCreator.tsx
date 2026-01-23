@@ -817,8 +817,22 @@ export default function MainCreator() {
               </div>
 
               <button onClick={generateStory} disabled={loading} className="w-full h-20 bg-primary text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-primary/30 hover:scale-[1.02]">
-                {loading ? <Loader2 className="animate-spin" /> : <Wand2 />}
-                Write My Story
+                {loading ? (
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-6 h-6">
+                      <div className="absolute inset-0 bg-white/30 rounded-full animate-ping" />
+                      <div className="relative bg-white w-full h-full rounded-full flex items-center justify-center">
+                        <Wand2 className="text-primary w-3 h-3" />
+                      </div>
+                    </div>
+                    <span>Weaving Magic...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Wand2 />
+                    Write My Story
+                  </>
+                )}
               </button>
               <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-2">Premium Story Generation Value: ${STORY_COST} {BASE_CURRENCY}</p>
             </div>
