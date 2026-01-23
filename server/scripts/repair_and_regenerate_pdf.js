@@ -14,7 +14,7 @@ async function repairAndRegenerate() {
 
   try {
     // Find a book that needs repair (has a PDF URL but needs regenerating)
-    const book = await db.collection('books').findOne({
+    const book = await db.collection('books').findOne({ _id: new ObjectId("69730269d19d72eb53e10955"), 
       pdfUrl: { $exists: true, $ne: null }
     }, { sort: { createdAt: -1 } });
 

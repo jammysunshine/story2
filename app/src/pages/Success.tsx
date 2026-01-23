@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star } from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default function SuccessPage() {
   const [searchParams] = useSearchParams();
@@ -13,35 +13,36 @@ export default function SuccessPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let interval: number | null = null;
+    let intervalId: any = null;
 
-    const startPolling = async () => {
-      if (bookId) {
-        interval = window.setInterval(async () => {
-          try {
-            const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
-            if (res.data.pdfUrl) {
-              setPdfUrl(res.data.pdfUrl);
-              if (interval !== null) window.clearInterval(interval);
-            }
-          } catch (e: unknown) {
-            console.error('Polling failed', e);
+    const pollStatus = async () => {
+      if (!bookId) return;
+      try {
+        const res = await axios.get(`${API_URL}/book-status?bookId=${bookId}`);
+        if (res.data.pdfUrl) {
+          setPdfUrl(res.data.pdfUrl);
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
           }
-        }, 10000);
+        }
+      } catch (e) {
+        console.error('Success page polling failed:', e);
       }
     };
 
-    startPolling();
+    if (bookId) {
+      pollStatus(); // Run once immediately
+      intervalId = setInterval(pollStatus, 10000);
+    }
 
-    // Set loading to false after a short delay to allow UI to render
+    // Set loading to false after a short delay
     const timer = setTimeout(() => {
-      if (bookId) {
-        setLoading(false);
-      }
+      setLoading(false);
     }, 500);
 
     return () => {
-      if (interval !== null) window.clearInterval(interval);
+      if (intervalId) clearInterval(intervalId);
       clearTimeout(timer);
     };
   }, [bookId]);

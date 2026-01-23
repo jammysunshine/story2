@@ -472,20 +472,30 @@ app.get('/api/book-status', async (req, res) => {
 app.post('/api/generate-pdf', async (req, res) => {
   const { bookId } = req.body;
   try {
+    logger.info(`📄 [PDF_GEN] Starting generation for Book: ${bookId}`);
     const pdfUrl = await generatePdf(db, bookId);
     const signedUrl = await get7DaySignedUrl(pdfUrl);
+    
+    logger.info(`🔗 [PDF_GEN] SUCCESS! PDF Link generated: ${signedUrl.substring(0, 100)}...`);
 
     // Send PDF ready email to the user
     const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
     if (book && book.userId) {
       const { sendStoryEmail } = require('./mail');
-      await sendStoryEmail(book.userId, book.title, signedUrl);
-      logger.info(`📧 PDF ready email sent to ${book.userId}`);
+      logger.info(`📡 [EMAIL_TRIGGER] Attempting to send PDF email to: ${book.userId}`);
+      try {
+        await sendStoryEmail(book.userId, book.title, signedUrl);
+        logger.info(`✅ [EMAIL_TRIGGER] SUCCESS! PDF ready email sent to ${book.userId}`);
+      } catch (emailError) {
+        logger.error(`❌ [EMAIL_TRIGGER] FAILED to send email to ${book.userId}: ${emailError.message}`);
+      }
+    } else {
+      logger.warn(`⚠️ [EMAIL_TRIGGER] SKIPPED: No userId found for book ${bookId}`);
     }
 
     res.json({ success: true, pdfUrl: signedUrl });
   } catch (error) {
-    logger.error('PDF generation failed:', error.message);
+    logger.error(`💥 [PDF_GEN] FAILED for Book ${bookId}: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
@@ -691,14 +701,20 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
 
       logger.info('📦 Gelato fulfillment initiated successfully');
     } else {
-      logger.info('✨ [FULFILLMENT] Digital order complete. Skipping physical printing.');
+      logger.info('✨ [FULFILLMENT] Digital order complete. PDF is ready.');
 
       // For digital orders, send PDF ready email
-      const { sendStoryEmail } = require('./mail');
-      const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
-      if (book && book.userId) {
-        await sendStoryEmail(book.userId, book.title, pdfUrl);
-        logger.info('📧 PDF ready email sent for digital order');
+      if (email) {
+        const { sendStoryEmail } = require('./mail');
+        const signedUrl = await get7DaySignedUrl(pdfUrl);
+        logger.info(`🔗 [DIGITAL_FULFILLMENT] Generated signed link: ${signedUrl.substring(0, 100)}...`);
+        logger.info(`📡 [DIGITAL_FULFILLMENT] Attempting to send email to: ${email}`);
+        try {
+          await sendStoryEmail(email, bookRecord.title || 'Your Digital Storybook', signedUrl);
+          logger.info(`✅ [DIGITAL_FULFILLMENT] SUCCESS! Email sent to ${email}`);
+        } catch (emailError) {
+          logger.error(`❌ [DIGITAL_FULFILLMENT] FAILED to send email to ${email}: ${emailError.message}`);
+        }
       }
     }
 
