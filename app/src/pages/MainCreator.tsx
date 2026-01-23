@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2 } from 'lucide-react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText } from 'lucide-react'
 import axios from 'axios'
 import {
   Sheet,
@@ -89,6 +89,23 @@ export default function MainCreator() {
   const [book, setBook] = useState<Book | null>(null)
   const bookRef = useRef<Book | null>(null); // To solve stale closure in poller
   const isHydrated = useRef(false);
+
+  // Calculate progress based on images generated
+  const calculateProgress = () => {
+    if (!book?.pages) return 0;
+    const totalTeaserPages = Math.min(TEASER_LIMIT, book.pages.length);
+    const teaserPages = book.pages.slice(0, totalTeaserPages);
+    const completedPages = teaserPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
+    return Math.round((completedPages / totalTeaserPages) * 100);
+  };
+
+  // Calculate progress for full book generation (after payment)
+  const calculateFullBookProgress = () => {
+    if (!book?.pages) return 0;
+    const totalPages = book.pages.length;
+    const completedPages = book.pages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
+    return Math.round((completedPages / totalPages) * 100);
+  };
 
   // Sync ref with state whenever book changes
   useEffect(() => { bookRef.current = book; }, [book]);
@@ -368,7 +385,10 @@ export default function MainCreator() {
           });
 
           // Stop polling if we reached a final state
-          if (['preview', 'illustrated', 'paid', 'printing', 'teaser_ready'].includes(newStatus)) {
+          // NOTE: We don't stop on 'paid' anymore since full image generation and PDF generation happen after payment
+          // We continue polling if status is 'pdf_ready' but pdfUrl is not yet available
+          if (['preview', 'illustrated', 'printing', 'teaser_ready'].includes(newStatus) ||
+              (newStatus === 'pdf_ready' && bookRef.current?.pdfUrl)) {
             console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
             if (pollingRef.current) {
               clearInterval(pollingRef.current);
@@ -676,49 +696,180 @@ export default function MainCreator() {
 
       {step === 3 && book && (
         <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
-          <div className="text-center">
-            <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
-            <p className="text-slate-400 mt-4">We're painting the first {TEASER_LIMIT} pages for free!</p>
-          </div>
-
-          <div className="space-y-20">
-            {book.pages?.map((p: BookPage, i: number) => (
-              <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
-                <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
-                  {i < TEASER_LIMIT ? (
-                    p.imageUrl && !p.imageUrl.includes('placeholder') ? (
-                      <img
-                        key={p.imageUrl}
-                        src={p.imageUrl}
-                        className="w-full h-full object-cover"
-                        alt={`Page ${i + 1}`}
-                        onError={() => {
-                          console.error(`Failed to load image: ${p.imageUrl}`);
-                          // If image fails to load, it might be an expired signed URL
-                          // We can't easily trigger a single page refresh here without complex state,
-                          // but the poller will eventually get a new one.
-                          // For now, let's just log it.
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
-                        <Palette className="text-slate-700 w-12 h-12" />
-                        <p className="text-[10px] font-black uppercase text-slate-700 tracking-widest text-center px-8">AI is painting this page...</p>
-                      </div>
-                    )
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-700">
-                      <Lock size={48} />
-                      <p className="text-[10px] font-black uppercase tracking-widest">Order to Unlock Illustration</p>
-                    </div>
-                  )}
-                </div>
-                <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg">
-                  <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
+          {/* Check if we're in the painting phase (not all teaser images are done yet) */}
+          {book.status !== 'teaser_ready' && calculateProgress() < 100 ? (
+            // Show centralized loading animation when teaser images are being generated
+            <div className="py-20 text-center space-y-10">
+              <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-pink-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 border-4 border-pink-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
+                  <Palette className="animate-pulse text-pink-500 w-20 h-20" />
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
+                <p className="text-slate-400 text-lg font-medium">Generating {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} stunning AI illustrations...</p>
+              </div>
+              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
+                  style={{
+                    width: `${calculateProgress()}%`
+                  }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                Estimated Time: 2-3 Minutes
+              </p>
+            </div>
+          ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
+            // Show centralized loading animation when full book images are being generated after payment
+            <div className="py-20 text-center space-y-10">
+              <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-blue-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 border-4 border-blue-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
+                  <Palette className="animate-pulse text-blue-500 w-20 h-20" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
+                <p className="text-slate-400 text-lg font-medium">Generating all {book.pages?.length || 23} illustrations for your full book...</p>
+              </div>
+              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-1000 ease-out"
+                  style={{
+                    width: `${calculateFullBookProgress()}%`
+                  }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                Estimated Time: 5-8 Minutes
+              </p>
+            </div>
+          ) : book.status === 'paid' && !book.pdfUrl ? (
+            // Show loading animation when PDF is being generated
+            <div className="py-20 text-center space-y-10">
+              <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-amber-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 border-4 border-amber-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
+                  <FileText className="animate-pulse text-amber-500 w-20 h-20" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your PDF</h2>
+                <p className="text-slate-400 text-lg font-medium">Assembling your beautifully illustrated book into a PDF...</p>
+              </div>
+              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000 ease-out"
+                  style={{
+                    width: '75%' // PDF generation is typically quick once images are ready
+                  }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                Estimated Time: 1-2 Minutes
+              </p>
+            </div>
+          ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
+            // Show loading animation when PDF is being prepared for download
+            <div className="py-20 text-center space-y-10">
+              <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-green-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 border-4 border-green-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
+                  <FileText className="animate-pulse text-green-500 w-20 h-20" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finalizing Your PDF</h2>
+                <p className="text-slate-400 text-lg font-medium">Your PDF is ready! Preparing download link...</p>
+              </div>
+              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-1000 ease-out"
+                  style={{
+                    width: '100%'
+                  }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                Almost Ready!
+              </p>
+            </div>
+          ) : book.status === 'printing' ? (
+            // Show loading animation when book is being printed
+            <div className="py-20 text-center space-y-10">
+              <div className="relative w-48 h-48 mx-auto">
+                <div className="absolute inset-0 bg-purple-500/20 rounded-full animate-ping" />
+                <div className="relative bg-slate-900 border-4 border-purple-500/50 w-full h-full rounded-full flex items-center justify-center shadow-2xl">
+                  <Package className="animate-pulse text-purple-500 w-20 h-20" />
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Printing Your Book</h2>
+                <p className="text-slate-400 text-lg font-medium">Your hardcover book is being professionally printed and will ship soon!</p>
+              </div>
+              <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 ease-out"
+                  style={{
+                    width: '100%'
+                  }}
+                />
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
+                On Its Way To You!
+              </p>
+            </div>
+          ) : (
+            // Show the book preview with individual page placeholders
+            <>
+              <div className="text-center">
+                <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
+                <p className="text-slate-400 mt-4">We're painting the first {TEASER_LIMIT} pages for free!</p>
+              </div>
+
+              <div className="space-y-20">
+                {book.pages?.map((p: BookPage, i: number) => (
+                  <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
+                    <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
+                      {i < TEASER_LIMIT ? (
+                        p.imageUrl && !p.imageUrl.includes('placeholder') ? (
+                          <img
+                            key={p.imageUrl}
+                            src={p.imageUrl}
+                            className="w-full h-full object-cover"
+                            alt={`Page ${i + 1}`}
+                            onError={() => {
+                              console.error(`Failed to load image: ${p.imageUrl}`);
+                              // If image fails to load, it might be an expired signed URL
+                              // We can't easily trigger a single page refresh here without complex state,
+                              // but the poller will eventually get a new one.
+                              // For now, let's just log it.
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
+                            <Palette className="text-slate-700 w-12 h-12" />
+                            <p className="text-[10px] font-black uppercase text-slate-700 tracking-widest text-center px-8">AI is painting this page...</p>
+                          </div>
+                        )
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-700">
+                          <Lock size={48} />
+                          <p className="text-[10px] font-black uppercase tracking-widest">Order to Unlock Illustration</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg">
+                      <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
             <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
