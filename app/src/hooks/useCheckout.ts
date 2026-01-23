@@ -11,7 +11,7 @@ export const useCheckout = () => {
     try {
       // Use the provided API_URL or fallback to relative path for better production compatibility
       const baseUrl = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${baseUrl}/api/create-checkout`, {
+      const response = await fetch(`${baseUrl}/create-checkout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

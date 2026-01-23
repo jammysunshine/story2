@@ -87,7 +87,7 @@ export default function SuccessPage() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Total Paid</span>
-              <span className="font-black text-lg">${import.meta.env.VITE_PRINT_PRICE || '25'}.00 {(import.meta.env.VITE_BASE_CURRENCY || 'aud').toUpperCase()}</span>
+              <span className="font-black text-lg">${Number(import.meta.env.VITE_PRINT_PRICE || '25').toFixed(2)} {(import.meta.env.VITE_BASE_CURRENCY || 'aud').toUpperCase()}</span>
             </div>
             <div className="pt-6 border-t border-white/5 flex justify-between items-center">
               <span className="px-4 py-1.5 bg-green-500/10 text-green-500 rounded-full font-black text-[10px] uppercase tracking-widest ring-1 ring-green-500/20">Verified Paid</span>

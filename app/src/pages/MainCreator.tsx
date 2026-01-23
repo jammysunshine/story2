@@ -86,7 +86,11 @@ export default function MainCreator() {
   }
 
   const [book, setBook] = useState<Book | null>(null)
+  const bookRef = useRef<Book | null>(null); // To solve stale closure in poller
   const isHydrated = useRef(false);
+
+  // Sync ref with state whenever book changes
+  useEffect(() => { bookRef.current = book; }, [book]);
 
   console.log('MainCreator render: step', step, 'bookId', book?.bookId)
   interface User {
@@ -335,7 +339,7 @@ export default function MainCreator() {
           const newPages = res.data.pages || [];
           
           // SAFETY: If API returns empty pages for a book we know should have pages, ABORT
-          if (newPages.length === 0 && book.pages && book.pages.length > 0) {
+          if (newPages.length === 0 && bookRef.current?.pages && bookRef.current.pages.length > 0) {
             console.warn('⚠️ API returned 0 pages for existing book. Ignoring to prevent UI collapse.');
             return;
           }
