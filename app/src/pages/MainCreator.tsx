@@ -18,7 +18,7 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
 
 //console.warn('⚠️⚠️⚠️ MAIN CREATOR FILE LOADED AT:', new Date().toLocaleTimeString());
 
-const API_URL = 'http://localhost:3001/api'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 const TEASER_LIMIT = parseInt(import.meta.env.VITE_STORY_TEASER_PAGES_COUNT || '7');
 
 // Pricing Constants for UI Display
@@ -145,8 +145,11 @@ export default function MainCreator() {
     // 1. RESTORE STATE
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      console.warn('👤 Restored User:', JSON.parse(savedUser).email);
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      console.warn('👤 Restored User:', parsedUser.email);
+      // Auto-fetch orders for returning user
+      fetchOrders(parsedUser.token);
     }
     
     const savedBook = localStorage.getItem('book');
@@ -386,12 +389,13 @@ export default function MainCreator() {
     };
   }, [step, book?.bookId]);
 
-  const fetchOrders = async () => {
-    if (!user?.token) return;
+  const fetchOrders = async (explicitToken?: string) => {
+    const token = explicitToken || user?.token;
+    if (!token) return;
     setOrdersLoading(true);
     try {
       const res = await axios.get(`${API_URL}/orders`, {
-        headers: { Authorization: `Bearer ${user.token}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
       setOrders(res.data.orders);
     } catch (err: unknown) {
