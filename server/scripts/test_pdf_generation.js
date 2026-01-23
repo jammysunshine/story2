@@ -3,7 +3,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const { generatePdf } = require('../pdfService');
 
 async function testPdfScript() {
-  const bookId = "69709cf3e829dfa9cc00609a";
+  const bookId = "69730269d19d72eb53e10955";
   console.log(`\n--- 🕵️ EXPLICIT TRACE FOR BOOK: ${bookId} ---`);
 
   const client = new MongoClient(process.env.MONGODB_URI, { 
