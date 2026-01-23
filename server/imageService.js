@@ -375,15 +375,16 @@ async function generateImages(db, bookId, isFulfillment = false) {
     async function paintPageWithRetry(pageIndex) {
       const page = updatedPages[pageIndex];
       // STRENGTHENED PAINT CHECK:
-      // 1. Identify valid filenames for this page (handling reference images for P2/P3)
+      // 1. Identify valid filenames for this page (handling reference images for P2/P3/P4)
       const expectedFileName = `page_${page.pageNumber}.png`;
-      const isReference = (page.pageNumber === 2 || page.pageNumber === 3);
-      const refFileName = page.pageNumber === 2 ? 'hero_reference.png' : 'animal_reference.png';
+      const isReference = (page.pageNumber === 2 || page.pageNumber === 3 || page.pageNumber === 4);
+      const refFileName = page.pageNumber === 2 ? 'hero_reference.png' : page.pageNumber === 3 ? 'hero_reference.png' : 'animal_reference.png';
 
       // 2. Resolve the GCS path we want to check (Robust path extraction)
       let gcsFileName = `books/${bookId}/${expectedFileName}`;
       if (page.pageNumber === 2) gcsFileName = `books/${bookId}/hero_reference.png`;
-      else if (page.pageNumber === 3) gcsFileName = `books/${bookId}/animal_reference.png`;
+      else if (page.pageNumber === 3) gcsFileName = `books/${bookId}/hero_reference.png`;
+      else if (page.pageNumber === 4) gcsFileName = `books/${bookId}/animal_reference.png`;
       else if (page.pageNumber === 1 || page.type === 'photo') {
         const photoUrl = page.url || page.imageUrl || '';
         if (photoUrl.includes('storage.googleapis.com')) {
@@ -433,6 +434,8 @@ async function generateImages(db, bookId, isFulfillment = false) {
           if (page.pageNumber === 2) {
             characterInstruction = `Refer to Ref 1 for the child hero's appearance. (CRITICAL: Only the child hero should be in this scene, no animal friend yet).`;
           } else if (page.pageNumber === 3) {
+            characterInstruction = `Refer to Ref 1 for the child hero's appearance. (CRITICAL: Only the child hero should be in this scene, no animal friend yet).`;
+          } else if (page.pageNumber === 4) {
             characterInstruction = `Refer to Ref 2 for the animal friend's appearance. (CRITICAL: Only the animal friend should be in this scene, no child hero yet).`;
           }
 
