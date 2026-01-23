@@ -449,8 +449,10 @@ app.get('/api/orders', async (req, res) => {
     });
     const payload = ticket.getPayload();
     const email = payload.email;
+    logger.info(`🔍 [ORDER_FETCH] Fetching orders for email: ${email}`);
 
     const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
+    logger.info(`🔍 [ORDER_FETCH] Found ${orders.length} orders for ${email}`);
     res.json({ success: true, orders });
   } catch (error) {
     // MORE ROBUST LOGGING: Catch specific Google Auth errors or provide full context
@@ -497,17 +499,19 @@ app.post('/api/generate-pdf', async (req, res) => {
 
     // Send PDF ready email to the user
     const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
-    if (book && book.userId) {
+    const emailRecipient = book?.userId || book?.customerEmail;
+
+    if (emailRecipient) {
       const { sendStoryEmail } = require('./mail');
-      logger.info(`📡 [EMAIL_TRIGGER] Attempting to send PDF email to: ${book.userId}`);
+      logger.info(`📡 [EMAIL_TRIGGER] Attempting to send PDF email to: ${emailRecipient} (Found in ${book?.userId ? 'userId' : 'customerEmail'})`);
       try {
-        await sendStoryEmail(book.userId, book.title, signedUrl);
-        logger.info(`✅ [EMAIL_TRIGGER] SUCCESS! PDF ready email sent to ${book.userId}`);
+        await sendStoryEmail(emailRecipient, book.title, signedUrl);
+        logger.info(`✅ [EMAIL_TRIGGER] SUCCESS! PDF ready email sent to ${emailRecipient}`);
       } catch (emailError) {
-        logger.error(`❌ [EMAIL_TRIGGER] FAILED to send email to ${book.userId}: ${emailError.message}`);
+        logger.error(`❌ [EMAIL_TRIGGER] FAILED to send email to ${emailRecipient}: ${emailError.message}`);
       }
     } else {
-      logger.warn(`⚠️ [EMAIL_TRIGGER] SKIPPED: No userId found for book ${bookId}`);
+      logger.warn(`⚠️ [EMAIL_TRIGGER] SKIPPED: No recipient email found in record for book ${bookId}. Fields: { userId: ${book?.userId}, customerEmail: ${book?.customerEmail} }`);
     }
 
     res.json({ success: true, pdfUrl: signedUrl });
@@ -531,10 +535,21 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
     const bookId = session.metadata.bookId;
-    const email = session.customer_details.email;
+    const stripeEmail = session.customer_details.email;
+    const accountEmail = session.metadata.accountEmail;
+
+    // IDENTITY LOGIC: Prioritize logged-in account email over Stripe billing email
+    const email = accountEmail || stripeEmail;
     const type = session.metadata.type || 'book'; // default to book if not specified
 
-    logger.info(`💰 Payment Received for Book ${bookId} from ${email}`, { type });
+    logger.info(`💰 [CHECKOUT_COMPLETE] Processing Identity:`, {
+      bookId,
+      finalEmail: email,
+      fromAccount: !!accountEmail,
+      accountEmail,
+      stripeEmail,
+      type
+    });
 
     // 1. Create Order Record
     const shipping = session.shipping_details;
@@ -748,7 +763,7 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
 
 app.post('/api/create-checkout', async (req, res) => {
   try {
-    const { bookId, bookTitle } = req.body;
+    const { bookId, bookTitle, accountEmail } = req.body;
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       phone_number_collection: { enabled: true },
@@ -757,7 +772,7 @@ app.post('/api/create-checkout', async (req, res) => {
       mode: 'payment',
       success_url: `${process.env.APP_URL}/success?bookId=${bookId}`,
       cancel_url: `${process.env.APP_URL}/`,
-      metadata: { bookId }
+      metadata: { bookId, accountEmail }
     });
     res.json({ url: session.url });
   } catch (error) { res.status(500).json({ error: error.message }); }

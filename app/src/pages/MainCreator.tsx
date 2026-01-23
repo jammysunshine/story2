@@ -748,7 +748,7 @@ export default function MainCreator() {
                   }
 
                   if (book && book.bookId && book.title) {
-                    createCheckoutSession(book.bookId, book.title);
+                    createCheckoutSession(book.bookId, book.title, currentUser?.email);
                   } else {
                     toast({
                       title: "Error",

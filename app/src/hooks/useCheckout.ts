@@ -4,7 +4,7 @@ export const useCheckout = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createCheckoutSession = async (bookId: string, bookTitle: string) => {
+  const createCheckoutSession = async (bookId: string, bookTitle: string, accountEmail?: string) => {
     setLoading(true);
     setError(null);
 
@@ -16,7 +16,7 @@ export const useCheckout = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ bookId, bookTitle }),
+        body: JSON.stringify({ bookId, bookTitle, accountEmail }),
       });
 
       if (!response.ok) {
