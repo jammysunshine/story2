@@ -53,7 +53,7 @@ async function generatePdf(db, bookId) {
 
   const expectedImages = book.pages.length;
   let allImagesReady = false;
-  const maxWaitTime = (expectedImages / 2) * 120000; // Allow 1 min per image on average, total ~13m for 27 pages
+  const maxWaitTime = (expectedImages / 2) * 120000; // Allow 1 min per image on average
   const pollInterval = 30000;
   let waited = 0;
 
@@ -62,28 +62,40 @@ async function generatePdf(db, bookId) {
     logger.info(`📡 Checking GCS for ${expectedImages} images (Waited ${waited / 1000}s)...`);
 
     for (const page of book.pages) {
-      let fileName = `books/${bookId}/page_${page.pageNumber}.png`;
+      // DYNAMIC PATH RESOLUTION
+      let fileName = '';
+      const photoUrl = page.imageUrl || page.url || '';
 
-      if (page.type === 'photo' || page.pageNumber === 1) {
-        const photoUrl = page.url || page.imageUrl || '';
-        if (photoUrl.includes('storage.googleapis.com')) {
-          const parts = photoUrl.split('storage.googleapis.com/')[1];
-          let internalPath = parts ? parts.split('?')[0] : '';
-          if (internalPath.startsWith(`${imagesBucketName}/`)) {
-            fileName = internalPath.replace(`${imagesBucketName}/`, '');
-          } else {
-            fileName = internalPath;
-          }
+      if (photoUrl.includes('storage.googleapis.com')) {
+        const parts = photoUrl.split('storage.googleapis.com/')[1];
+        let internalPath = parts ? parts.split('?')[0] : '';
+        if (internalPath.startsWith(`${imagesBucketName}/`)) {
+          fileName = internalPath.replace(`${imagesBucketName}/`, '');
+        } else {
+          fileName = internalPath;
         }
-      } else if (page.pageNumber === 2 || page.pageNumber === 3) {
-        const refType = page.pageNumber === 2 ? 'hero' : 'animal';
-        fileName = `books/${bookId}/${refType}_reference.png`;
+      }
+
+      if (!fileName) {
+        // Fallback for newly initiated books without URLs yet
+        if (page.pageNumber === 2) {
+          // P2 is always Hero Photo/Ref
+          fileName = page.type === 'photo' ? `books/${bookId}/hero_photo.png` : `books/${bookId}/hero_reference.png`;
+        } else if (page.pageNumber === 3) {
+          // P3 is always Hero Intro (uses hero ref)
+          fileName = `books/${bookId}/hero_reference.png`;
+        } else if (page.pageNumber === 4) {
+          // P4 is always Animal Friend
+          fileName = `books/${bookId}/animal_reference.png`;
+        } else {
+          // P5+ are standard story pages
+          fileName = `books/${bookId}/page_${page.pageNumber}.png`;
+        }
       }
 
       const [exists] = await imagesBucket.file(fileName).exists();
       if (exists) {
         readyCount++;
-        // logger.debug(`✅ [PDF TRACE] Found image: P${page.pageNumber} at ${fileName}`);
       } else {
         logger.error(`❌ [PDF TRACE] MISSING IMAGE: P${page.pageNumber} at path: ${fileName}`);
       }
@@ -145,7 +157,7 @@ async function generatePdf(db, bookId) {
     const mergedPdf = await PDFDocument.create();
     const baseUrl = process.env.APP_URL || 'http://localhost:5173';
     const storyPageCount = book.pages.length;
-    const totalActualPages = storyPageCount + 1; // +1 for Title Page
+    const totalActualPages = storyPageCount + 1; // +1 for the Title Page rendered first in PrintTemplate.tsx
     const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');
 
     logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
@@ -179,7 +191,7 @@ async function generatePdf(db, bookId) {
       logger.info('✅ All images loaded successfully in browser.');
     }
 
-    logger.info(`📖 Capturing ${totalActualPages} story pages...`);
+    logger.info(`📖 Capturing ${totalActualPages} total pages (Title + ${storyPageCount} story parts)...`);
 
     for (let i = 0; i < totalActualPages; i++) {
       logger.info(`📄 Slicing page ${i + 1}/${totalActualPages}...`);

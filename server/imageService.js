@@ -298,27 +298,41 @@ async function generateImages(db, bookId, isFulfillment = false) {
       generateReferenceImageRace(activeAnimalBible, 'animal', null, bookRecord.characterStyle)
     ]);
 
-    giLog.info('🏗️ STEP 2: CONSTRUCTING MASTER ARRAY (27 Pages)');
+    giLog.info('🏗️ STEP 2: CONSTRUCTING MASTER ARRAY (27 Pages for DB + 1 Title Page in UI = 28 Total)');
     const masterPages = [];
 
+    // 1. HERO PHOTO / REF (P2 in book)
     if (bookRecord.photoUrl) {
-      masterPages.push({ pageNumber: 1, type: 'photo', text: `Look, here is the real you! Ready to start the story?`, url: bookRecord.photoUrl, imageUrl: bookRecord.photoUrl, prompt: `The real photo of the child` });
+      masterPages.push({ pageNumber: 2, type: 'photo', text: `Look, here is the real you! Ready to start the story?`, url: bookRecord.photoUrl, imageUrl: bookRecord.photoUrl, prompt: `The real photo of the child` });
     } else {
-      masterPages.push({ pageNumber: 1, type: 'photo', text: `Look, here is you as a storybook hero! Ready to start?`, url: heroRefUrl, imageUrl: heroRefUrl, prompt: `The stylized storybook character portrait of the child` });
+      masterPages.push({ pageNumber: 2, type: 'photo', text: `Look, here is you as a storybook hero! Ready to start?`, url: heroRefUrl, imageUrl: heroRefUrl, prompt: `The stylized storybook character portrait of the child` });
     }
 
+    // 2. HERO INTRO (P3 in book)
     if (bookRecord.photoUrl) {
-      masterPages.push({ pageNumber: 2, type: 'story', text: `And here is your character in the story!`, imageUrl: heroRefUrl, prompt: `The stylized storybook character portrait of the child` });
+      masterPages.push({ pageNumber: 3, type: 'story', text: `And here is your character in the story!`, imageUrl: heroRefUrl, prompt: `The stylized storybook character portrait of the child` });
     } else {
-      const introPrompt = `Our hero child ${bookRecord.childName} is standing in the ${bookRecord.location || 'beautiful landscape'}, looking at the horizon with a bright smile, ready for a big ${bookRecord.theme || 'adventure'}. ${bookRecord.occasion ? `Occasion: ${bookRecord.occasion}.` : ''} Bathed in the ${bookRecord.characterStyle} aesthetic.`;
-      masterPages.push({ pageNumber: 2, type: 'story', text: `Once upon a time, your adventure began right here!`, prompt: introPrompt });
+      const introPrompt = `Our hero child ${bookRecord.childName} is standing in the ${bookRecord.location || 'beautiful landscape'}, looking at the horizon with a bright smile, ready for a big adventure. Bathed in the ${bookRecord.characterStyle} aesthetic.`;
+      masterPages.push({ pageNumber: 3, type: 'story', text: `Once upon a time, your adventure began right here!`, prompt: introPrompt });
     }
 
-    masterPages.push({ pageNumber: 3, type: 'story', text: `Meet your brave friend, ${bookRecord.animal}!`, imageUrl: animalRefUrl, prompt: `The animal character friend` });
-    pages.forEach((p, idx) => { masterPages.push({ ...p, type: 'story', pageNumber: idx + 4 }); });
-    masterPages.push({ pageNumber: masterPages.length + 1, type: 'story', text: "The End. May your adventures never truly end!", prompt: bookRecord.finalPrompt || `A heartwarming final interaction scene between the child hero and their animal friend.` });
+    // 3. ANIMAL FRIEND (P4 in book)
+    masterPages.push({ pageNumber: 4, type: 'story', text: `Meet your brave friend, ${bookRecord.animal}!`, imageUrl: animalRefUrl, prompt: `The animal character friend ${bookRecord.animalBible}` });
 
-    giLog.info(`📊 Master array constructed: ${masterPages.length} pages total`);
+    // 4-26. STORY CONTENT (23 Pages -> P5-P27 in book)
+    pages.forEach((p, idx) => {
+      masterPages.push({ ...p, type: 'story', pageNumber: idx + 5 });
+    });
+
+    // 27. END PAGE (P28 in book)
+    masterPages.push({
+      pageNumber: 28,
+      type: 'story',
+      text: "The End. May your adventures never truly end!",
+      prompt: bookRecord.finalPrompt || `A heartwarming final interaction scene between the child hero and their animal friend.`
+    });
+
+    giLog.info(`📊 Master array constructed: ${masterPages.length} pages total in DB.`);
 
     // IDEMPOTENCY FIX: If book already has the expected pages, do NOT overwrite with a fresh array
     // which might filter/slice differently and cause shifts.

@@ -198,11 +198,49 @@ export default function MainCreator() {
       console.warn('📍 Restored Tab:', savedTab);
     }
 
-    // 2. LOCK HYDRATION (Wait a frame to ensure state is restored before persistence wakes up)
-    setTimeout(() => {
-      isHydrated.current = true;
-      console.warn('💎 Hydration Complete: state restored from memory');
-    }, 100);
+    // Check if user just returned from payment
+    const justPaid = localStorage.getItem('justPaid');
+    if (justPaid && savedBook) {
+      console.warn('🔓 Payment detected, refreshing book state...');
+      localStorage.removeItem('justPaid');
+      // Force refresh from server
+      const refreshBook = async () => {
+        try {
+
+          // 2. LOCK HYDRATION (Wait a frame to ensure state is restored before persistence wakes up)
+          setTimeout(() => {
+            isHydrated.current = true;
+            console.warn('💎 Hydration Complete: state restored from memory');
+          }, 100);
+          const res = await axios.get(`${API_URL}/book-status?bookId=${JSON.parse(savedBook).bookId}`);
+          const updated = { ...JSON.parse(savedBook), ...res.data, bookId: JSON.parse(savedBook).bookId };
+          setBook(updated);
+          localStorage.setItem('book', JSON.stringify(updated));
+          console.warn('✅ Book refreshed, unlock status:', res.data.isDigitalUnlocked);
+        } catch (e) {
+          console.error('Failed to refresh book:', e);
+        }
+      };
+      refreshBook();
+    }
+
+    // Background PDF monitoring
+    if (savedBook) {
+      const monitorPdf = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/book-status?bookId=${JSON.parse(savedBook).bookId}`);
+          if (res.data.pdfUrl && !pdfReady) {
+            setPdfReady(true);
+            setShowPdfToast(true);
+            setTimeout(() => setShowPdfToast(false), 10000);
+          }
+        } catch (e) {
+          console.error('PDF monitoring failed:', e);
+        }
+      };
+      const pdfInterval = setInterval(monitorPdf, 15000);
+      return () => clearInterval(pdfInterval);
+    }
   }, []);
 
   useEffect(() => {
@@ -594,6 +632,29 @@ export default function MainCreator() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 font-sans pb-20">
+      {/* PDF Ready Toast */}
+      {showPdfToast && (
+        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-top-5 duration-500">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl shadow-green-500/30 flex items-center gap-4 max-w-md">
+            <FileDown className="w-6 h-6 animate-bounce" />
+            <div className="flex-1">
+              <p className="font-black text-sm uppercase tracking-wide">Your PDF is Ready!</p>
+              <p className="text-xs opacity-90">Click to download your book</p>
+            </div>
+            <button
+              onClick={() => {
+                const pdfUrl = book?.pdfUrl;
+                if (pdfUrl) window.open(pdfUrl, '_blank');
+                setShowPdfToast(false);
+              }}
+              className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all"
+            >
+              Download
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="flex flex-col md:flex-row justify-between items-center mb-12 pt-[env(safe-area-inset-top)] gap-6">
         <h1
           onClick={resetCreator}
@@ -762,6 +823,7 @@ export default function MainCreator() {
                 (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
                 // Show centralized loading animation when teaser images are being generated
                 <div className="py-20 text-center space-y-10">
+                  {console.log("DEBUG: Rendering teaser generation animation. Status:", book.status, "Progress:", calculateProgress())}
                   <MagicGlow color="pink" />
                   <div className="space-y-4">
                     <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
@@ -802,6 +864,7 @@ export default function MainCreator() {
               ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
                 // Show centralized loading animation when full book images are being generated after payment
                 <div className="py-20 text-center space-y-10">
+                  {console.log("DEBUG: Rendering full book generation animation. Status:", book.status, "Full progress:", calculateFullBookProgress())}
                   <MagicGlow color="blue" />
                   <div className="space-y-4">
                     <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
@@ -822,6 +885,7 @@ export default function MainCreator() {
               ) : book.status === 'paid' && !book.pdfUrl ? (
                 // Show loading animation when PDF is being generated
                 <div className="py-20 text-center space-y-10">
+                  {console.log("DEBUG: Rendering PDF generation animation. Status:", book.status, "PDF URL exists:", !!book.pdfUrl)}
                   <MagicGlow color="amber" />
                   <div className="space-y-4">
                     <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
