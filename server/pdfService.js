@@ -81,7 +81,8 @@ async function generatePdf(db, bookId) {
       if (exists) {
         readyCount++;
       } else {
-        logger.debug(`⏳ [PDF TRACE] Missing image for P${page.pageNumber}: ${fileName}`);
+        logger.error(`⏳ [PDF TRACE] MISSING IMAGE: P${page.pageNumber} at path: ${fileName}`);
+        readyCount = readyCount; // No change, but let's be explicit
       }
     }
 
@@ -192,11 +193,13 @@ async function generatePdf(db, bookId) {
             if (img) {
               try {
                 if (img.src && img.src !== 'none') {
-                  await img.decode(); // FORCE CHROME TO FINISH RENDERING PIXELS
+                  // WAIT FOR IMAGE TO FINISH DECODING PIXELS
+                  await img.decode();
                   currentImgInfo.decoded = true;
                 }
               } catch (e) {
                 currentImgInfo.decoded = false;
+                console.error(`IMAGE DECODE FAILED for ${img.src}:`, e.message);
               }
               currentImgInfo.src = img.src.substring(0, 100) + '...';
               currentImgInfo.visible = img.offsetParent !== null;
