@@ -366,10 +366,23 @@ async function generateImages(db, bookId, isFulfillment = false) {
       const isReference = (page.pageNumber === 2 || page.pageNumber === 3);
       const refFileName = page.pageNumber === 2 ? 'hero_reference.png' : 'animal_reference.png';
 
-      // 2. Resolve the GCS path we want to check
+      // 2. Resolve the GCS path we want to check (Robust path extraction)
       let gcsFileName = `books/${bookId}/${expectedFileName}`;
       if (page.pageNumber === 2) gcsFileName = `books/${bookId}/hero_reference.png`;
-      if (page.pageNumber === 3) gcsFileName = `books/${bookId}/animal_reference.png`;
+      else if (page.pageNumber === 3) gcsFileName = `books/${bookId}/animal_reference.png`;
+      else if (page.pageNumber === 1 || page.type === 'photo') {
+        const photoUrl = page.url || page.imageUrl || '';
+        if (photoUrl.includes('storage.googleapis.com')) {
+          const parts = photoUrl.split('storage.googleapis.com/')[1];
+          let internalPath = parts ? parts.split('?')[0] : '';
+          const bucketName = process.env.GCS_IMAGES_BUCKET_NAME;
+          if (internalPath.startsWith(`${bucketName}/`)) {
+            gcsFileName = internalPath.replace(`${bucketName}/`, '');
+          } else {
+            gcsFileName = internalPath;
+          }
+        }
+      }
 
       const isActuallyPainted = page.imageUrl &&
         !page.imageUrl.includes('placeholder') &&

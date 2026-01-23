@@ -85,7 +85,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 let db;
 
 async function connectDB() {
-  const client = new MongoClient(process.env.MONGODB_URI, { 
+  const client = new MongoClient(process.env.MONGODB_URI, {
     family: 4,
     serverSelectionTimeoutMS: MONGODB_TIMEOUT_MS,
     connectTimeoutMS: MONGODB_TIMEOUT_MS
@@ -98,8 +98,8 @@ async function connectDB() {
 // --- SECURITY: SIGNED URLS ---
 
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'healthy', 
+  res.status(200).json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     database: db ? 'connected' : 'disconnected'
@@ -108,14 +108,14 @@ app.get('/health', (req, res) => {
 
 async function getSignedUrl(gcsPath) {
   if (!gcsPath) return null;
-  
+
   // 1. Strip any existing query parameters or versioning (e.g., ?v=123 or ?X-Goog-...)
   let cleanPath = gcsPath.split('?')[0];
-  
+
   // 2. Extract the relative file path from the full URL
   const bucketPrefix = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/`;
   const filePath = cleanPath.replace(bucketPrefix, '');
-  
+
   try {
     const [url] = await bucket.file(filePath).getSignedUrl({
       version: 'v4',
@@ -143,7 +143,7 @@ async function generateImageRace(prompt, bookId, pageNumber) {
     const response = await result.response;
     const imagePart = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
     if (!imagePart?.inlineData?.data) throw new Error("No image");
-    
+
     const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
     const fileName = `books/${bookId}/page_${pageNumber}.png`;
     return await uploadToGCS(buffer, fileName, 'image/png');
@@ -181,7 +181,7 @@ app.post('/api/auth/social', async (req, res) => {
     );
     logger.info(`👤 User Logged In: ${email}`);
     res.json({ success: true, user: user.value || user });
-  } catch (err) { 
+  } catch (err) {
     logger.error('Auth failure:', err.message);
     res.status(500).json({ error: 'Auth failed' });
   }
@@ -223,7 +223,7 @@ function getSafeAgeDescription(age) {
 app.post('/api/generate-story', async (req, res) => {
   try {
     const { childName, age, gender = 'Boy', skinTone, hairStyle, hairColor, animal, characterStyle, occasion, language, theme = 'custom', email, photoUrl } = req.body;
-    
+
     const ageDescription = getSafeAgeDescription(age || '5');
     const lesson = req.body.lesson?.toLowerCase() === 'none' ? '' : req.body.lesson;
     const location = req.body.location?.toLowerCase() === 'none' ? '' : req.body.location;
@@ -231,7 +231,7 @@ app.post('/api/generate-story', async (req, res) => {
     let persona = "specialist children's book author";
     let targetAudience = `a child named ${childName}`;
     let extraInstructions = "The story should be appropriate for children.";
-    
+
     if (theme === 'valentine') {
       persona = "poetic and sophisticated romantic author";
       targetAudience = `a beloved person named ${childName}`;
@@ -328,7 +328,7 @@ app.post('/api/generate-story', async (req, res) => {
 
         let cleanText = storyText.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
         storyData = JSON.parse(cleanText);
-        
+
         logger.info('✅ JSON parsing successful');
         logger.info('✅ ========== STORY GENERATED SUCCESSFULLY ==========');
         logger.info(`👶 Hero Bible: ${storyData.heroBible}`);
@@ -390,41 +390,49 @@ app.post('/api/generate-story', async (req, res) => {
         isDigitalUnlocked: true,
         createdAt: bookDoc.createdAt
       };
-      
+
       await db.collection('users').updateOne(
         { email: email.toLowerCase() },
-        { 
+        {
           $inc: { storiesCount: 1 },
-          $push: { 
+          $push: {
             recentBooks: {
               $each: [recentBookEntry],
               $position: 0,
               $slice: 2
             }
           },
-          $set: { updatedAt: new Date() } 
+          $set: { updatedAt: new Date() }
         },
         { upsert: true }
       );
     }
 
     res.json({ success: true, bookId: bookIdObj.toString(), ...storyData });
-  } catch (error) { 
+  } catch (error) {
     logger.error({ msg: 'Story gen failed', error: error.message });
-    res.status(500).json({ error: error.message }); 
+    res.status(500).json({ error: error.message });
   }
 });
 
 app.post('/api/generate-images', async (req, res) => {
   const { bookId } = req.body;
   res.json({ success: true, message: 'Painting started' });
-  generateImages(db, bookId).catch(err => {
-    logger.error('💥 [IMAGE_GEN_CRASH]', { 
-      message: err.message, 
-      stack: err.stack,
-      bookId 
+
+  try {
+    const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+    const isFulfillment = ['paid', 'printing', 'printing_test', 'pdf_ready'].includes(book?.status || '');
+
+    generateImages(db, bookId, isFulfillment).catch(err => {
+      logger.error('💥 [IMAGE_GEN_CRASH]', {
+        message: err.message,
+        stack: err.stack,
+        bookId
+      });
     });
-  });
+  } catch (e) {
+    logger.error('Failed to start image generation:', e.message);
+  }
 });
 
 app.get('/api/orders', async (req, res) => {
@@ -435,18 +443,18 @@ app.get('/api/orders', async (req, res) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    const ticket = await googleClient.verifyIdToken({ 
-      idToken: token, 
-      audience: process.env.GOOGLE_CLIENT_ID 
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID
     });
     const payload = ticket.getPayload();
     const email = payload.email;
 
     const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
     res.json({ success: true, orders });
-  } catch (error) { 
+  } catch (error) {
     logger.error('Order fetch failed:', error.message);
-    res.status(401).json({ error: 'Invalid token' }); 
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
@@ -461,7 +469,7 @@ app.get('/api/book-status', async (req, res) => {
       return res.status(404).json({ error: 'Book not found' });
     }
     const securedPages = await Promise.all((book.pages || []).map(async p => ({ ...p, imageUrl: await getSignedUrl(p.imageUrl) })));
-    
+
     let signedPdfUrl = null;
     if (book.pdfUrl) {
       const { get7DaySignedUrl } = require('./pdfService');
@@ -482,7 +490,7 @@ app.post('/api/generate-pdf', async (req, res) => {
     logger.info(`📄 [PDF_GEN] Starting generation for Book: ${bookId}`);
     const pdfUrl = await generatePdf(db, bookId);
     const signedUrl = await get7DaySignedUrl(pdfUrl);
-    
+
     logger.info(`🔗 [PDF_GEN] SUCCESS! PDF Link generated: ${signedUrl.substring(0, 100)}...`);
 
     // Send PDF ready email to the user
@@ -507,7 +515,7 @@ app.post('/api/generate-pdf', async (req, res) => {
   }
 });
 
-app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
   try {
@@ -561,12 +569,12 @@ app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, re
     // 1.1 Sync latest address/phone to User Profile for future convenience
     await db.collection('users').updateOne(
       { email: email.toLowerCase() },
-      { 
-        $set: { 
+      {
+        $set: {
           lastShippingAddress: orderData.shippingAddress,
           phone: customerPhone,
-          updatedAt: new Date() 
-        } 
+          updatedAt: new Date()
+        }
       }
     ).catch(e => logger.error('Failed to sync address to user profile:', e));
 
@@ -704,7 +712,7 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
         const { sendStoryEmail } = require('./mail');
         const { get7DaySignedUrl } = require('./pdfService');
         const signedUrl = await get7DaySignedUrl(pdfUrl);
-        
+
         logger.info(`📡 [DIGITAL_FULFILLMENT] Sending email to: ${customerEmail}`);
         try {
           // Fetch book title fresh
