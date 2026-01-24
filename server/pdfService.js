@@ -155,7 +155,12 @@ async function generatePdf(db, bookId) {
     await page.setViewport({ width: 2400, height: 3300, deviceScaleFactor: 1 });
 
     const mergedPdf = await PDFDocument.create();
-    const baseUrl = process.env.APP_URL || 'http://localhost:5173';
+    const baseUrl = process.env.INTERNAL_APP_URL || process.env.APP_URL || 'http://localhost:3000';
+    logger.info(`🎯 [PDF_DEBUG] Using base URL for PDF generation: ${baseUrl}`);
+
+    const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
+    logger.info(`🎯 [PDF_DEBUG] Full template URL: ${fullTemplateUrl}`);
+
     const storyPageCount = book.pages.length;
     const totalActualPages = storyPageCount + 1; // +1 for the Title Page rendered first in PrintTemplate.tsx
     const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');
@@ -163,13 +168,28 @@ async function generatePdf(db, bookId) {
     logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
     const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
 
-    await page.goto(fullTemplateUrl, {
+    logger.info(`🎯 [PDF_DEBUG] Attempting to navigate to: ${fullTemplateUrl}`);
+    const response = await page.goto(fullTemplateUrl, {
       waitUntil: 'networkidle0',
       timeout: 120000
     });
+    logger.info(`🎯 [PDF_DEBUG] Navigation completed, URL is now: ${page.url()}`);
+    logger.info(`🎯 [PDF_DEBUG] HTTP Status: ${response.status()}, Status Text: ${response.statusText()}`);
+
+    // Check if the page loaded correctly
+    const htmlContent = await page.content();
+    logger.info(`🎯 [PDF_DEBUG] Page HTML length: ${htmlContent.length}`);
+
+    // Check if the element exists in the DOM
+    const elementExists = await page.evaluate(() => {
+      return document.querySelector('.page') !== null;
+    });
+    logger.info(`🎯 [PDF_DEBUG] Does .page element exist in DOM: ${elementExists}`);
 
     // WAIT FOR REACT TO RENDER DATA
+    logger.info(`🎯 [PDF_DEBUG] Waiting for .page selector...`);
     await page.waitForSelector('.page', { timeout: 60000 });
+    logger.info(`🎯 [PDF_DEBUG] Found .page selector successfully`);
 
     logger.info('⏳ Waiting for all images to load in browser...');
     const imageStatus = await page.evaluate(async () => {
