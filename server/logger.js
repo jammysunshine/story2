@@ -4,6 +4,12 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
+  // Map levels to Google Cloud "severity" for better visibility in Logs Explorer
+  formatters: {
+    level: (label) => {
+      return { severity: label.toUpperCase() };
+    },
+  },
   // In GCloud/Production, we log raw JSON to stdout. 
   // In development, we use pino-pretty for human-readable logs.
   transport: isProduction ? undefined : {

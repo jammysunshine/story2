@@ -1,13 +1,16 @@
+# Stage 1: Base
 FROM --platform=linux/amd64 node:20-slim AS base
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
+# Stage 2: Install dependencies
 FROM base AS deps
 WORKDIR /app
 COPY server/package*.json ./
 RUN npm ci --only=production
 
+# Stage 3: Production runner
 FROM base AS runner
 WORKDIR /app
 
@@ -50,7 +53,10 @@ RUN apt-get update && \
     ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+
+# Copy application source and config
 COPY server/ ./
 COPY config/ ./config/
 
