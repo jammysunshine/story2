@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "bridge": "adb reverse tcp:3001 tcp:3001 && adb reverse tcp:3000 tcp:3001"
+    "bridge": "adb reverse tcp:3001 tcp:3001 && adb reverse tcp:3000 tcp:3001",
+    "dev:cloud": "VITE_API_URL=https://storytime-backend-q3ns32tlga-ts.a.run.app/api vite",
+    "build:cloud": "VITE_API_URL=https://storytime-backend-q3ns32tlga-ts.a.run.app/api vite build",
+    "switch:cloud": "npm run build:cloud && npx cap sync"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",

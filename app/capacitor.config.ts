@@ -6,7 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     cleartext: true,
-    allowNavigation: ['10.202.14.197']
+    allowNavigation: [
+      'https://storytime-backend-q3ns32tlga-ts.a.run.app'
+    ]
   },
   plugins: {
     GoogleAuth: {
