@@ -841,7 +841,14 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
 
 app.post('/api/create-checkout', async (req, res) => {
   try {
+    if (!req.body || Object.keys(req.body).length === 0) {
+      console.error('[CHECKOUT_ERROR] Request body is empty. Ensure Content-Type: application/json is set.');
+      return res.status(400).json({ error: 'Request body is empty' });
+    }
+
     const { bookId, bookTitle, accountEmail } = req.body;
+    console.log(`[CHECKOUT_START] bookId=${bookId}, email=${accountEmail}, title=${bookTitle}`);
+    
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       phone_number_collection: { enabled: true },
@@ -852,8 +859,18 @@ app.post('/api/create-checkout', async (req, res) => {
       cancel_url: `${process.env.APP_URL}/`,
       metadata: { bookId, accountEmail }
     });
+    console.log(`[CHECKOUT_SUCCESS] sessionId=${session.id}`);
     res.json({ url: session.url });
-  } catch (error) { res.status(500).json({ error: error.message }); }
+  } catch (error) { 
+    console.error('[CHECKOUT_ERROR] Detailed Stripe failure:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      param: error.param,
+      request_id: error.requestId
+    });
+    res.status(500).json({ error: error.message }); 
+  }
 });
 
 connectDB().then(() => {
