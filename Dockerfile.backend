@@ -1,20 +1,10 @@
-# Stage 1: Base
+# Stage 1: Base with system dependencies
 FROM --platform=linux/amd64 node:20-slim AS base
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Stage 2: Install dependencies
-FROM base AS deps
-WORKDIR /app
-COPY server/package*.json ./
-RUN npm ci --only=production
-
-# Stage 3: Production runner
-FROM base AS runner
-WORKDIR /app
-
-# Install Chromium for Puppeteer (optimized for Cloud Run)
+# 1. Install Chromium once in the base image (This layer is heavily cached)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     chromium \
@@ -53,18 +43,29 @@ RUN apt-get update && \
     ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy application source and config
-COPY server/ ./
-COPY config/ ./config/
-
-# Create non-root user for security
+# 2. Create user once in the base image
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 -g nodejs --create-home nodejs
 
-RUN chown -R nodejs:nodejs /app
+# Stage 2: Dependencies
+FROM base AS deps
+WORKDIR /app
+COPY server/package*.json ./
+RUN npm ci --only=production
+
+# Stage 3: Production runner
+FROM base AS runner
+WORKDIR /app
+
+# Copy dependencies (Changes only when package.json changes)
+COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./
+
+# Copy config (Changes rarely)
+COPY --chown=nodejs:nodejs config/ ./config/
+
+# Copy application source (Changes most often - kept at the end)
+COPY --chown=nodejs:nodejs server/ ./
+
 USER nodejs
 
 EXPOSE 3000
