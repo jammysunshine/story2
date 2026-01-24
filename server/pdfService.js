@@ -156,10 +156,11 @@ async function generatePdf(db, bookId) {
 
     const mergedPdf = await PDFDocument.create();
     
-    // CONSISTENCY FIX: Force localhost for internal Puppeteer rendering 
+    // CONSISTENCY FIX: Force 127.0.0.1 for internal Puppeteer rendering 
     // This avoids external network/DNS issues and ensures it hits the locally served frontend.
-    const internalPort = process.env.PORT || 3000;
-    const baseUrl = `http://localhost:${internalPort}`;
+    // We use 3001 as fallback to match the default in server/index.js
+    const internalPort = process.env.PORT || 3001;
+    const baseUrl = `http://127.0.0.1:${internalPort}`;
     
     logger.info(`🎯 [PDF_DEBUG] Using internal base URL for PDF generation: ${baseUrl}`);
 
