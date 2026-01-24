@@ -14,9 +14,9 @@ async function findUnclaimedStories() {
 
   const client = new MongoClient(MONGODB_URI, {
     family: 4,
-    serverSelectionTimeoutMS: 30000,
-    connectTimeoutMS: 30000,
-    socketTimeoutMS: 60000
+    serverSelectionTimeoutMS: 300000,
+    connectTimeoutMS: 300000,
+    socketTimeoutMS: 300000
   });
 
   try {
