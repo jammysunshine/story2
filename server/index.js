@@ -1,4 +1,5 @@
 const express = require('express');
+console.log('🚀 NODE PROCESS STARTING...');
 const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -947,6 +948,7 @@ app.post('/api/create-checkout', async (req, res) => {
 });
 
 // --- FRONTEND SERVING ---
+console.log(`📡 Preparing to listen on port: ${port}`);
 // Serve static files from the 'public_html' directory (built Vite app)
 const publicPath = path.join(__dirname, 'public_html');
 app.use(express.static(publicPath));
@@ -969,7 +971,5 @@ app.listen(port, '0.0.0.0', () => {
   // Connect to database in the background
   connectDB().catch(err => {
     logger.error('❌ Failed to connect to MongoDB:', err.message);
-    // We don't exit here to allow the server to keep running and retrying if logic supports it, 
-    // or at least stay alive for health checks.
   });
 });
