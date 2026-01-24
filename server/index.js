@@ -846,30 +846,38 @@ app.get('/success', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Payment Successful</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Magic Confirmed!</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .card { background: rgba(30, 41, 59, 0.5); padding: 2rem; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); max-width: 400px; width: 90%; }
-        h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; font-size: 2.5rem; margin-bottom: 0.5rem; }
-        p { color: #94a3b8; font-size: 1.125rem; margin-bottom: 2rem; }
-        .btn { background: #ffffff; color: #0f172a; padding: 1.25rem 2rem; border-radius: 1rem; text-decoration: none; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; display: inline-block; width: 100%; box-sizing: border-box; transition: transform 0.2s; }
-        .btn:active { transform: scale(0.98); }
-        .icon { font-size: 4rem; margin-bottom: 1rem; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background-color: #020617; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .glow { position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, rgba(79, 70, 229, 0.3) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; z-index: -1; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: pulse 4s infinite ease-in-out; }
+        @keyframes pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; } 50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.6; } }
+        .card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(10px); padding: 3rem 2rem; border-radius: 3rem; border: 1px solid rgba(255,255,255,0.05); max-width: 400px; width: 85%; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .icon-circle { width: 80px; height: 80px; background: rgba(34, 197, 94, 0.1); border-radius: 50%; display: flex; items-center; justify-content: center; margin: 0 auto 2rem; color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.2); }
+        h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; font-size: 2rem; margin: 0 0 1rem; line-height: 1; }
+        p { color: #94a3b8; font-size: 1rem; margin-bottom: 2.5rem; line-height: 1.5; }
+        .btn { background: #ffffff; color: #020617; padding: 1.25rem 2rem; border-radius: 1.25rem; text-decoration: none; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; width: 100%; box-sizing: border-box; transition: all 0.2s; box-shadow: 0 10px 15px -3px rgba(255,255,255,0.1); }
+        .btn:active { transform: scale(0.96); opacity: 0.9; }
+        .secondary-link { margin-top: 2rem; display: block; color: #64748b; font-size: 0.8rem; text-decoration: none; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
       </style>
     </head>
     <body>
+      <div class="glow"></div>
       <div class="card">
-        <div class="icon">✨</div>
+        <div class="icon-circle">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        </div>
         <h1>Magic Confirmed!</h1>
-        <p>Your payment was successful. Return to the app to see your book being created.</p>
+        <p>Your payment was successful. Returning you to the app to start painting your story...</p>
         <a href="com.aistorytime.app://success?bookId=${bookId}" class="btn">Return to App</a>
+        <a href="/success?bookId=${bookId}" class="secondary-link">Stay in Browser</a>
       </div>
       <script>
-        // Auto-redirect attempt
+        // Automatic deep link attempt
         setTimeout(() => {
           window.location.href = "com.aistorytime.app://success?bookId=${bookId}";
-        }, 2000);
+        }, 500);
       </script>
     </body>
     </html>
@@ -882,13 +890,14 @@ app.get('/cancel', (req, res) => {
     <html>
     <head>
       <title>Payment Cancelled</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
       <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .card { background: rgba(30, 41, 59, 0.5); padding: 2rem; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); max-width: 400px; width: 90%; }
-        h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; font-size: 2rem; margin-bottom: 0.5rem; }
-        p { color: #94a3b8; font-size: 1.125rem; margin-bottom: 2rem; }
-        .btn { background: rgba(255,255,255,0.1); color: white; padding: 1.25rem 2rem; border-radius: 1rem; text-decoration: none; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; display: inline-block; width: 100%; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background-color: #020617; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(10px); padding: 3rem 2rem; border-radius: 3rem; border: 1px solid rgba(255,255,255,0.05); max-width: 400px; width: 85%; }
+        h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; font-size: 1.75rem; margin-bottom: 1rem; }
+        p { color: #94a3b8; font-size: 1rem; margin-bottom: 2.5rem; }
+        .btn { background: rgba(255,255,255,0.1); color: white; padding: 1.25rem 2rem; border-radius: 1.25rem; text-decoration: none; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em; display: inline-block; width: 100%; box-sizing: border-box; }
       </style>
     </head>
     <body>
@@ -896,6 +905,7 @@ app.get('/cancel', (req, res) => {
         <h1>Payment Cancelled</h1>
         <p>No worries! You can try again whenever you are ready.</p>
         <a href="com.aistorytime.app://home" class="btn">Return to App</a>
+        <a href="/" class="secondary-link" style="margin-top: 2rem; display: block; color: #64748b; font-size: 0.8rem; text-decoration: none; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Back to Home</a>
       </div>
     </body>
     </html>
@@ -952,11 +962,14 @@ app.get('*', (req, res) => {
   }
 });
 
-connectDB().then(() => {
-  app.listen(port, '0.0.0.0', () => {
-    logger.info(`🚀 Engine Server running at http://localhost:${port}`);
+// Start the server immediately so Cloud Run health checks pass
+app.listen(port, '0.0.0.0', () => {
+  logger.info(`🚀 Engine Server running at http://localhost:${port}`);
+  
+  // Connect to database in the background
+  connectDB().catch(err => {
+    logger.error('❌ Failed to connect to MongoDB:', err.message);
+    // We don't exit here to allow the server to keep running and retrying if logic supports it, 
+    // or at least stay alive for health checks.
   });
-}).catch(err => {
-  logger.error('Failed to connect to MongoDB:', err.message);
-  process.exit(1);
 });

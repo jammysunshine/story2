@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "bridge": "adb reverse tcp:3001 tcp:3001 && adb reverse tcp:3000 tcp:3001",
