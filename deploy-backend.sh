@@ -28,10 +28,14 @@ BACKEND_URL=$(gcloud run services describe storytime-backend \
 echo "🎉 Backend deployed successfully!"
 echo "📍 Backend URL: $BACKEND_URL"
 
-# Update mobile app .env.production with the new URL
+# Update mobile app .env with the new URL
 echo "📱 Updating mobile app configuration..."
-sed "s|https://ai-storytime-backend-xxxxx.au.a.run.app|${BACKEND_URL}|g" ../app/.env.production > ../app/.env.production.temp
-mv ../app/.env.production.temp ../app/.env.production
+# Update the VITE_API_URL line, uncommenting it if necessary
+if grep -q "VITE_API_URL=" app/.env; then
+    sed -i '' "s|^#*VITE_API_URL=.*|VITE_API_URL=${BACKEND_URL}/api|g" app/.env
+else
+    echo "VITE_API_URL=${BACKEND_URL}/api" >> app/.env
+fi
 
 echo "✅ Mobile app configuration updated!"
 echo ""

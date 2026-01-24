@@ -68,10 +68,13 @@ if [ $? -eq 0 ]; then
     if [ ! -z "$BACKEND_URL" ]; then
         echo "📍 Backend URL: $BACKEND_URL"
         
-        # Update mobile app .env.production with new URL
+        # Update mobile app .env with new URL
         echo "📱 Updating mobile app configuration..."
-        sed "s|https://storytime-backend-xxxxx.au.a.run.app|${BACKEND_URL}|g" ../app/.env.production > ../app/.env.production.temp
-        mv ../app/.env.production.temp ../app/.env.production
+        if grep -q "VITE_API_URL=" app/.env; then
+            sed -i '' "s|^#*VITE_API_URL=.*|VITE_API_URL=${BACKEND_URL}/api|g" app/.env
+        else
+            echo "VITE_API_URL=${BACKEND_URL}/api" >> app/.env
+        fi
         echo "✅ Mobile app configuration updated!"
     else
         echo "❌ Could not get backend URL"

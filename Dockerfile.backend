@@ -52,13 +52,14 @@ RUN apt-get update && \
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY server/ ./
+COPY config/ ./config/
 
-# Create non-root user for security (skip if exists)
-RUN groupadd --system --gid 1001 nodejs 2>/dev/null || true && \
-    useradd --system --uid 1001 --gid 1001 --create-home nodejs 2>/dev/null || true
+# Create non-root user for security
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 -g nodejs --create-home nodejs
 
-RUN chown -R nodejs:nodejs /app || true
-USER nodejs || USER root
+RUN chown -R nodejs:nodejs /app
+USER nodejs
 
 EXPOSE 3000
 ENV PORT=3000
