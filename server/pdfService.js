@@ -158,15 +158,13 @@ async function generatePdf(db, bookId) {
     const baseUrl = process.env.INTERNAL_APP_URL || process.env.APP_URL || 'http://localhost:3000';
     logger.info(`🎯 [PDF_DEBUG] Using base URL for PDF generation: ${baseUrl}`);
 
-    const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
-    logger.info(`🎯 [PDF_DEBUG] Full template URL: ${fullTemplateUrl}`);
-
     const storyPageCount = book.pages.length;
     const totalActualPages = storyPageCount + 1; // +1 for the Title Page rendered first in PrintTemplate.tsx
     const GELATO_MIN_PAGES = parseInt(process.env.PRINT_MIN_PAGES || '28');
 
-    logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
     const fullTemplateUrl = `${baseUrl}/print/template/${bookId}`;
+    logger.info(`🎯 [PDF_DEBUG] Full template URL: ${fullTemplateUrl}`);
+    logger.info('🚀 [PDF TRACE] Loading full template (Single DB Hit)...');
 
     logger.info(`🎯 [PDF_DEBUG] Attempting to navigate to: ${fullTemplateUrl}`);
     const response = await page.goto(fullTemplateUrl, {
