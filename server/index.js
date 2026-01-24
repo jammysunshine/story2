@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -72,15 +73,15 @@ app.use((req, res, next) => { logger.debug(`${req.method} ${req.url} from ${req.
 
 const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
-const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
-const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
+const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '4999');
+const BASE_CURRENCY = process.env.BASE_CURRENCY || 'usd';
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'story-db';
 const MONGODB_TIMEOUT_MS = parseInt(process.env.MONGODB_TIMEOUT_MS || '90000');
 
 const STORY_COST = parseInt(process.env.STORY_COST || '10');
 const IMAGE_COST = parseInt(process.env.IMAGE_COST || '2');
 const PDF_COST = parseInt(process.env.PDF_COST || '15');
-const BOOK_COST = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
+const BOOK_COST = parseInt(process.env.PRINT_PRICE_AMOUNT || '4999');
 
 // Initialize Services
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -932,6 +933,22 @@ app.post('/api/create-checkout', async (req, res) => {
       request_id: error.requestId
     });
     res.status(500).json({ error: error.message }); 
+  }
+});
+
+// --- FRONTEND SERVING ---
+// Serve static files from the 'public_html' directory (built Vite app)
+const publicPath = path.join(__dirname, 'public_html');
+app.use(express.static(publicPath));
+
+// Catch-all route to serve the React app for any route not handled by the API
+// This is critical for React Router routes like /print/template/:bookId to work
+app.get('*', (req, res) => {
+  // Only serve index.html if it's not an API route
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(publicPath, 'index.html'));
+  } else {
+    res.status(404).json({ error: 'API endpoint not found' });
   }
 });
 

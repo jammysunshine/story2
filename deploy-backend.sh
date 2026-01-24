@@ -19,11 +19,12 @@ gcloud artifacts repositories create ai-storytime-backend \
 echo "🔨 Building and deploying..."
 gcloud builds submit --config=cloudbuild-backend.yaml .
 
-# Get the deployed backend URL
-echo "🔍 Getting backend URL..."
-BACKEND_URL=$(gcloud run services describe storytime-backend \
-    --region=australia-southeast1 \
-    --format='value(status.url)')
+# Get the project number for the dynamic URL
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+
+# Construct the project-numbered backend URL dynamically
+echo "🔍 Constructing dynamic backend URL..."
+BACKEND_URL="https://storytime-backend-${PROJECT_NUMBER}.australia-southeast1.run.app"
 
 echo "🎉 Backend deployed successfully!"
 echo "📍 Backend URL: $BACKEND_URL"

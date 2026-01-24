@@ -155,8 +155,13 @@ async function generatePdf(db, bookId) {
     await page.setViewport({ width: 2400, height: 3300, deviceScaleFactor: 1 });
 
     const mergedPdf = await PDFDocument.create();
-    const baseUrl = process.env.INTERNAL_APP_URL || process.env.APP_URL || 'http://localhost:3000';
-    logger.info(`🎯 [PDF_DEBUG] Using base URL for PDF generation: ${baseUrl}`);
+    
+    // CONSISTENCY FIX: Force localhost for internal Puppeteer rendering 
+    // This avoids external network/DNS issues and ensures it hits the locally served frontend.
+    const internalPort = process.env.PORT || 3000;
+    const baseUrl = `http://localhost:${internalPort}`;
+    
+    logger.info(`🎯 [PDF_DEBUG] Using internal base URL for PDF generation: ${baseUrl}`);
 
     const storyPageCount = book.pages.length;
     const totalActualPages = storyPageCount + 1; // +1 for the Title Page rendered first in PrintTemplate.tsx

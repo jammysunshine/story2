@@ -10,7 +10,7 @@ const logger = require("./logger");
 const IMAGE_COST = parseInt(process.env.IMAGE_COST || '2');
 const STORY_COST = parseInt(process.env.STORY_COST || '10');
 const PDF_COST = parseInt(process.env.PDF_COST || '15');
-const BOOK_COST = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
+const BOOK_COST = parseInt(process.env.PRINT_PRICE_AMOUNT || '4999');
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const STORY_BATCH_DELAY_MS = parseInt(process.env.STORY_BATCH_DELAY_MS || '5000');
 
