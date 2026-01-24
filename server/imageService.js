@@ -202,11 +202,15 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     const projectId = process.env.GCP_PROJECT_ID;
     const rawKeyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    const path = require('path');
-    const keyPath = path.isAbsolute(rawKeyPath) ? rawKeyPath : path.resolve(process.cwd(), rawKeyPath);
+    
+    let keyPath = null;
+    if (rawKeyPath) {
+      const path = require('path');
+      keyPath = path.isAbsolute(rawKeyPath) ? rawKeyPath : path.resolve(process.cwd(), rawKeyPath);
+    }
 
     giLog.info(`🔧 [IMAGE_GEN_DEBUG] Project ID from env: "${projectId}"`);
-    giLog.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path (Resolved): "${keyPath}"`);
+    giLog.info(`🔧 [IMAGE_GEN_DEBUG] Credentials Path (Resolved): "${keyPath || 'Using ADC'}"`);
 
     if (!projectId) {
       giLog.error('❌ [IMAGE_GEN_DEBUG] GCP_PROJECT_ID is MISSING or EMPTY.');
@@ -214,12 +218,16 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     let storage, authClient;
     try {
-      storage = new Storage({ projectId: projectId || undefined, keyFilename: keyPath });
-      authClient = new GoogleAuth({
+      const storageConfig = { projectId: projectId || undefined };
+      if (keyPath) storageConfig.keyFilename = keyPath;
+      storage = new Storage(storageConfig);
+
+      const authConfig = {
         projectId: projectId || undefined,
-        keyFilename: keyPath,
         scopes: ['https://www.googleapis.com/auth/cloud-platform']
-      });
+      };
+      if (keyPath) authConfig.keyFilename = keyPath;
+      authClient = new GoogleAuth(authConfig);
     } catch (authErr) {
       giLog.error(`❌ [IMAGE_GEN_DEBUG] Failed to initialize GCS/Auth Clients: ${authErr.message}`);
       throw authErr;

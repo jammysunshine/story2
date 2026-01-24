@@ -9,8 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "bridge": "adb reverse tcp:3001 tcp:3001 && adb reverse tcp:3000 tcp:3001",
-    "dev:cloud": "VITE_API_URL=https://storytime-backend-q3ns32tlga-ts.a.run.app/api vite",
-    "build:cloud": "VITE_API_URL=https://storytime-backend-q3ns32tlga-ts.a.run.app/api vite build",
+    "dev:cloud": "VITE_API_URL=https://storytime-backend-959069445137.australia-southeast1.run.app/api vite",
+    "build:cloud": "VITE_API_URL=https://storytime-backend-959069445137.australia-southeast1.run.app/api vite build",
     "switch:cloud": "npm run build:cloud && npx cap sync"
   },
   "dependencies": {

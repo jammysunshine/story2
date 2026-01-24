@@ -7,7 +7,7 @@ const config: CapacitorConfig = {
   server: {
     cleartext: true,
     allowNavigation: [
-      'https://storytime-backend-q3ns32tlga-ts.a.run.app'
+      'storytime-backend-959069445137.australia-southeast1.run.app'
     ]
   },
   plugins: {

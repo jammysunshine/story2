@@ -7,7 +7,7 @@ const logger = require('./logger');
 
 const storage = new Storage({
   projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+  ...(process.env.GOOGLE_APPLICATION_CREDENTIALS ? { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS } : {})
 });
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000;
