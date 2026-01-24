@@ -7,40 +7,7 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # 1. Install Chromium once in the base image (This layer is heavily cached)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    chromium \
-    fonts-liberation \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2 \
-    libdbus-1-3 \
-    libexpat1 \
-    libfontconfig1 \
-    libgbm1 \
-    libgcc1 \
-    libglib2.0-0 \
-    libgtk-3-0 \
-    libnspr4 \
-    libnss3 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
-    libxcomposite1 \
-    libxcursor1 \
-    libxdamage1 \
-    libxext6 \
-    libxfixes3 \
-    libxi6 \
-    libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
-    ca-certificates \
+    chromium fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 ca-certificates \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 2. Create user once in the base image
@@ -49,7 +16,7 @@ RUN groupadd --system --gid 1001 nodejs && \
 
 # Stage 2: Dependencies
 FROM base AS deps
-WORKDIR /app
+WORKDIR /build
 COPY server/package*.json ./
 RUN npm ci --only=production
 
@@ -57,13 +24,13 @@ RUN npm ci --only=production
 FROM base AS runner
 WORKDIR /app
 
-# Copy dependencies (Changes only when package.json changes)
-COPY --from=deps --chown=nodejs:nodejs /app/node_modules ./
+# Copy dependencies first
+COPY --from=deps --chown=nodejs:nodejs /build/node_modules ./node_modules
 
-# Copy config (Changes rarely)
+# Copy config
 COPY --chown=nodejs:nodejs config/ ./config/
 
-# Copy application source (Changes most often - kept at the end)
+# Copy application source
 COPY --chown=nodejs:nodejs server/ ./
 
 USER nodejs
