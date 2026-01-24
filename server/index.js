@@ -839,6 +839,68 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
   }
 }
 
+app.get('/success', (req, res) => {
+  const { bookId } = req.query;
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Payment Successful</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: rgba(30, 41, 59, 0.5); padding: 2rem; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); max-width: 400px; width: 90%; }
+        h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; font-size: 2.5rem; margin-bottom: 0.5rem; }
+        p { color: #94a3b8; font-size: 1.125rem; margin-bottom: 2rem; }
+        .btn { background: #ffffff; color: #0f172a; padding: 1.25rem 2rem; border-radius: 1rem; text-decoration: none; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; display: inline-block; width: 100%; box-sizing: border-box; transition: transform 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        .icon { font-size: 4rem; margin-bottom: 1rem; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="icon">✨</div>
+        <h1>Magic Confirmed!</h1>
+        <p>Your payment was successful. Return to the app to see your book being created.</p>
+        <a href="com.aistorytime.app://success?bookId=${bookId}" class="btn">Return to App</a>
+      </div>
+      <script>
+        // Auto-redirect attempt
+        setTimeout(() => {
+          window.location.href = "com.aistorytime.app://success?bookId=${bookId}";
+        }, 2000);
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+app.get('/cancel', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Payment Cancelled</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #020617; color: white; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: rgba(30, 41, 59, 0.5); padding: 2rem; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.1); max-width: 400px; width: 90%; }
+        h1 { font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; font-size: 2rem; margin-bottom: 0.5rem; }
+        p { color: #94a3b8; font-size: 1.125rem; margin-bottom: 2rem; }
+        .btn { background: rgba(255,255,255,0.1); color: white; padding: 1.25rem 2rem; border-radius: 1rem; text-decoration: none; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; display: inline-block; width: 100%; box-sizing: border-box; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Payment Cancelled</h1>
+        <p>No worries! You can try again whenever you are ready.</p>
+        <a href="com.aistorytime.app://home" class="btn">Return to App</a>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 app.post('/api/create-checkout', async (req, res) => {
   try {
     if (!req.body || Object.keys(req.body).length === 0) {
