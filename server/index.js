@@ -71,7 +71,7 @@ app.use(cors({
 }));
 app.use((req, res, next) => { console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${req.url} from ${req.ip}`); next(); });
 
-const port = process.env.PORT || 3005;
+const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '2500');
 const BASE_CURRENCY = process.env.BASE_CURRENCY || 'aud';
@@ -770,7 +770,7 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     }
 
     // Internal call should always hit the local Express port
-    const internalUrl = `http://localhost:3005`;
+    const internalUrl = `http://localhost:${port}`;
     const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
       method: 'POST',
       headers: {

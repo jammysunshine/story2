@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star, BookOpen, Sparkles, User as CircleUser, FileText } from 'lucide-react';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://10.202.14.197:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export default function SuccessPage() {
   const [searchParams] = useSearchParams();

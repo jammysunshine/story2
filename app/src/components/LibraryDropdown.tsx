@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://10.202.14.197:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export function LibraryDropdown({ user }: { user: any }) {
   const { toast } = useToast();
