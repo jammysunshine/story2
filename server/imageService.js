@@ -125,7 +125,9 @@ async function callGeminiImageGen(params) {
         return { error: 'SAFETY_FILTER_BLOCK', status: 200, modelUsed: 'gemini' };
       }
 
-      const imagePart = response?.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+      const candidate = response?.candidates?.[0];
+      const imagePart = candidate?.content?.parts?.find((p) => p.inlineData);
+      
       if (imagePart?.inlineData?.data) {
         log.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`);
         return {
@@ -134,7 +136,13 @@ async function callGeminiImageGen(params) {
           status: 200
         };
       }
-      log.warn(`⚠️ [Page ${pageNumber}] Gemini Pro did not return an image.`);
+
+      log.warn(`⚠️ [Page ${pageNumber}] Gemini Pro did not return an image. Candidate structure:`, {
+        finishReason: candidate?.finishReason,
+        partsCount: candidate?.content?.parts?.length,
+        hasContent: !!candidate?.content,
+        fullCandidate: JSON.stringify(candidate)
+      });
       return { error: 'NO_IMAGE_DATA', status: 200 };
     } else {
       log.error(`❌ [Page ${pageNumber}] GOOGLE_API_KEY IS MISSING FROM PROCESS.ENV`);

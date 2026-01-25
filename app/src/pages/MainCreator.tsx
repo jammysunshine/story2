@@ -271,14 +271,18 @@ export default function MainCreator() {
       let token;
       if (isWeb) {
         // --- WEB ENGINE (GSI) ---
+        console.log('🌐 Starting Web GSI Auth...');
         token = await new Promise((resolve, reject) => {
-          if (!(window as any).google) return reject(new Error('Google Library not loaded'));
+          if (!(window as any).google) {
+            console.error('❌ Google script NOT LOADED on window');
+            return reject(new Error('Google Library not loaded'));
+          }
           const client = (window as any).google.accounts.oauth2.initTokenClient({
             client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
             scope: 'email profile',
             callback: (resp: any) => {
               if (resp.error) {
-                console.error('❌ GSI Error:', resp.error);
+                console.error('❌ GSI Callback Error:', resp.error);
                 return reject(resp);
               }
               console.warn('📡 Token received from Web Engine');
@@ -289,6 +293,7 @@ export default function MainCreator() {
         });
       } else {
         // --- NATIVE ENGINE (Capacitor Plugin) ---
+        console.log('📱 Starting Native Capacitor Auth...');
         const googleUser = await GoogleAuth.signIn();
         console.warn('📡 Token received from Native Engine');
         token = googleUser.authentication.idToken;
@@ -304,7 +309,7 @@ export default function MainCreator() {
         return userData;
       }
     } catch (err: any) {
-      console.error('Login failed', err);
+      console.error('🔥 Login CRASH:', err);
       toast({ title: "Login Failed", description: err.message || "Authentication error", variant: "destructive" });
     }
     return null;
