@@ -923,14 +923,22 @@ app.post('/api/create-checkout', async (req, res) => {
     const { bookId, bookTitle, accountEmail } = req.body;
     console.log(`[CHECKOUT_START] bookId=${bookId}, email=${accountEmail}, title=${bookTitle}`);
     
+    const appUrl = (process.env.APP_URL || '').trim();
+    if (!appUrl) throw new Error('APP_URL environment variable is missing');
+    
+    const success_url = `${appUrl}/success?bookId=${bookId}`;
+    const cancel_url = `${appUrl}/`;
+    
+    console.log(`[CHECKOUT_DEBUG] Generating Stripe Session with: success_url=${success_url}, cancel_url=${cancel_url}`);
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       phone_number_collection: { enabled: true },
       shipping_address_collection: { allowed_countries: [] }, // Blank array allows all countries supported by Stripe
       line_items: [{ price_data: { currency: BASE_CURRENCY, product_data: { name: `Hardcover: ${bookTitle}` }, unit_amount: PRINT_PRICE_AMOUNT }, quantity: 1 }],
       mode: 'payment',
-      success_url: `${process.env.APP_URL}/success?bookId=${bookId}`,
-      cancel_url: `${process.env.APP_URL}/`,
+      success_url: success_url,
+      cancel_url: cancel_url,
       metadata: { bookId, accountEmail }
     });
     console.log(`[CHECKOUT_SUCCESS] sessionId=${session.id}`);
