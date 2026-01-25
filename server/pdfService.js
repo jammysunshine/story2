@@ -116,9 +116,9 @@ async function generatePdf(db, bookId) {
     throw new Error('PDF Generation Aborted: Not all images were ready in time.');
   }
 
-  const chromePath = process.platform === 'darwin'
+  const chromePath = process.env.PUPPETEER_EXECUTABLE_PATH || (process.platform === 'darwin'
     ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-    : '/usr/bin/chromium';
+    : '/usr/bin/chromium');
 
   logger.info(`🔧 Using Chrome executable: ${chromePath}`);
   logger.info(`🔧 Platform detected: ${process.platform}`);

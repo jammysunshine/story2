@@ -36,15 +36,15 @@ const REQUIRED_ENV_VARS = [
   'PRINT_PRICE_AMOUNT',
   'BASE_CURRENCY',
   'GELATO_API_KEY',
-  'MONGODB_DB_NAME'
+  'MONGODB_DB_NAME',
+  'GOOGLE_API_KEY_P'
 ];
 
 const missingVars = REQUIRED_ENV_VARS.filter(v => !process.env[v]);
 if (missingVars.length > 0) {
-  logger.error('❌ CRITICAL ERROR: Missing required environment variables:');
-  missingVars.forEach(v => logger.error(`   - ${v}`));
-  logger.error('The server will now exit. Please fix your .env file.');
-  process.exit(1);
+  logger.warn('⚠️ WARNING: Missing recommended environment variables:');
+  missingVars.forEach(v => logger.warn(`   - ${v}`));
+  logger.warn('The server will continue to start, but some features may fail.');
 } else {
   logger.info('✅ Environment variable check passed.');
 }
@@ -955,13 +955,9 @@ app.use(express.static(publicPath));
 
 // Catch-all route to serve the React app for any route not handled by the API
 // This is critical for React Router routes like /print/template/:bookId to work
-app.get('*', (req, res) => {
+app.get(/^((?!\/api).)*$/, (req, res) => {
   // Only serve index.html if it's not an API route
-  if (!req.path.startsWith('/api/')) {
-    res.sendFile(path.join(publicPath, 'index.html'));
-  } else {
-    res.status(404).json({ error: 'API endpoint not found' });
-  }
+  res.sendFile(path.join(publicPath, 'index.html'));
 });
 
 // Start the server immediately so Cloud Run health checks pass

@@ -1,28 +1,21 @@
 #!/bin/bash
 
 # Configuration
-IMAGE_NAME="ai-storytime"
-CONTAINER_PORT=3000
-HOST_PORT=3000
+IMAGE_NAME="storytime-backend-local"
+CONTAINER_PORT=3001
+HOST_PORT=3001
 
-# Path to Google Application Default Credentials
-# This is usually ~/.config/gcloud on macOS/Linux
-ADC_LOCAL_PATH="$HOME/.config/gcloud"
-ADC_CONTAINER_PATH="/home/nextjs/.config/gcloud"
-ADC_FILE="application_default_credentials.json"
+echo "🏗️  Building backend monolith..."
+docker build -t $IMAGE_NAME -f Dockerfile.backend .
 
-echo "🚀 Starting AI StoryTime Docker Container..."
+echo "🚀 Starting StoryTime Backend local container..."
 
 # Check if .env exists
-if [ ! -f .env ]; then
-    echo "❌ Error: .env file not found in current directory."
-    exit 1
-fi
-
-# Check if ADC exists
-if [ ! -f "$ADC_LOCAL_PATH/$ADC_FILE" ]; then
-    echo "⚠️  Warning: Google Application Default Credentials not found at $ADC_LOCAL_PATH/$ADC_FILE"
-    echo "💡 Run 'gcloud auth application-default login' if you need Google Cloud access."
+if [ ! -f server/.env ]; then
+    echo "⚠️ Warning: server/.env file not found. Using root .env if it exists."
+    ENV_FILE=".env"
+else
+    ENV_FILE="server/.env"
 fi
 
 # Stop and remove existing container if it exists
@@ -32,12 +25,10 @@ docker rm $IMAGE_NAME 2>/dev/null
 
 # Run the container
 echo "🏃 Running container on http://localhost:$HOST_PORT..."
-# We mount the ADC path but only set the env var if it's not handled by .env
-docker run -d \
+docker run \
   --name $IMAGE_NAME \
   -p $HOST_PORT:$CONTAINER_PORT \
-  --env-file .env \
-  -v "$ADC_LOCAL_PATH:$ADC_CONTAINER_PATH" \
+  --env-file $ENV_FILE \
   $IMAGE_NAME
 
 echo "✨ Container is now running in the background."

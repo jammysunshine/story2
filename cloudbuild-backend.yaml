@@ -28,7 +28,7 @@ steps:
       - '--platform'
       - 'managed'
       - '--port'
-      - '3000'
+      - '3001'
       - '--memory'
       - '4Gi'
       - '--cpu'

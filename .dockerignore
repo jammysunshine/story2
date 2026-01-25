@@ -13,9 +13,9 @@ dist
 storytime-mockups
 docs
 scripts
-*.png
-*.jpg
-*.html
+# *.png  <-- REMOVED: Needed for story images
+# *.jpg  <-- REMOVED: Needed for assets
+# *.html <-- REMOVED: Needed for frontend index.html
 response.json
 
 # Debugging and Logs
