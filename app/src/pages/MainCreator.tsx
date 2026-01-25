@@ -434,9 +434,9 @@ export default function MainCreator() {
               return prev;
             }
 
-            if (prevPaintedCount !== newPaintedCount || prev.status !== newStatus) {
+            if (prevPaintedCount !== newPaintedCount || prev.status !== newStatus || (res.data.pdfUrl && !prev.pdfUrl)) {
               console.warn(`✨ Updating UI: ${prevPaintedCount} -> ${newPaintedCount} images. Status: ${newStatus}`);
-              return { ...prev, status: newStatus, pages: [...newPages] };
+              return { ...prev, ...res.data, pages: [...newPages] };
             }
 
             return prev;
@@ -445,7 +445,7 @@ export default function MainCreator() {
           // Stop polling if we reached a final state
           // NOTE: We don't stop on 'paid', 'preview', or 'generating' anymore since image generation happens after these statuses
           // We continue polling during image generation phases
-          if (['illustrated', 'printing', 'printing_test', 'pdf_ready'].includes(newStatus) ||
+          if (['illustrated', 'printing', 'printing_test', 'shipped'].includes(newStatus) ||
             (newStatus === 'teaser_ready' && calculateProgress() === 100)) {
             console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
             if (pollingRef.current) {
