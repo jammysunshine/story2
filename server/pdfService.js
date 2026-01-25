@@ -140,6 +140,16 @@ async function generatePdf(db, bookId) {
       '--disable-background-networking',
       '--disable-gcm',
       '--disable-variations-service',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--password-store=basic',
+      '--use-mock-keychain',
+      '--mute-audio',
+      '--disable-background-timer-throttling',
+      '--disable-client-side-phishing-detection',
+      '--disable-component-extensions-with-background-pages',
+      '--disable-hang-monitor',
       '--js-flags="--max-old-space-size=512"'
     ],
   });
