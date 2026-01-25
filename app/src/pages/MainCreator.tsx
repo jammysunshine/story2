@@ -379,7 +379,7 @@ export default function MainCreator() {
   const randomizeFormData = () => {
     setFormData({
       childName: getRandomItem(randomNames),
-      age: (Math.floor(Math.random() * 8) + 3).toString(),
+      age: (Math.floor(Math.random() * 23) + 3).toString(),
       gender: getRandomItem(options.genders),
       skinTone: getRandomItem(options.skinTones),
       hairStyle: getRandomItem(options.hairStyles),
@@ -804,7 +804,7 @@ export default function MainCreator() {
                     <input value={formData.childName} onChange={e => setFormData({ ...formData, childName: e.target.value })} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
                   </div>
 
-                  {renderSelect('Age', 'age', ['3', '4', '5', '6', '7', '8', '9', '10'])}
+                  {renderSelect('Age', 'age', Array.from({ length: 23 }, (_, i) => (i + 3).toString()))}
                   {renderSelect('Gender', 'gender', options.genders)}
                   {renderSelect('Skin Tone', 'skinTone', options.skinTones)}
                   {renderSelect('Hair Style', 'hairStyle', options.hairStyles)}
