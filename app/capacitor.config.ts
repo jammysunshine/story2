@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'AI Storytime',
   webDir: 'dist',
   server: {
-    url: 'http://localhost:3000',
+    // url: 'http://localhost:3000',
     cleartext: true,
     allowNavigation: [
       'storytime-backend-959069445137.australia-southeast1.run.app'
