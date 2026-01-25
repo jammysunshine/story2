@@ -213,22 +213,22 @@ async function generatePdf(db, bookId) {
     await page.waitForSelector('.page', { timeout: 60000 });
     logger.info(`🎯 [PDF_DEBUG] Found .page selector successfully`);
 
-    logger.info('⏳ Waiting for all images to load in browser...');
-    const imageStatus = await page.evaluate(async () => {
+    logger.info('⏳ Waiting for all images to be fully decoded in browser memory...');
+    const bulkDecodeStatus = await page.evaluate(async () => {
       const images = Array.from(document.querySelectorAll('img'));
-      const results = await Promise.all(images.map(img => {
-        if (img.complete) return Promise.resolve({ src: img.src, status: 'already_complete' });
-        return new Promise(resolve => {
-          img.onload = () => resolve({ src: img.src, status: 'loaded' });
-          img.onerror = () => resolve({ src: img.src, status: 'error' });
-        });
+      const results = await Promise.allSettled(images.map(async img => {
+        if (!img.src || img.src === 'none') return 'skipped';
+        await img.decode();
+        return 'decoded';
       }));
-      return results;
+      return results.map(r => r.status === 'fulfilled' ? r.value : 'failed');
     });
 
-    const failedImages = imageStatus.filter((s) => s.status === 'error');
-    if (failedImages.length > 0) {
-      logger.warn(`⚠️ ${failedImages.length} images failed to load in Puppeteer!`);
+    const decodedCount = bulkDecodeStatus.filter(s => s === 'decoded').length;
+    const failedDecode = bulkDecodeStatus.filter(s => s === 'failed').length;
+    
+    if (failedDecode > 0) {
+      logger.warn(`⚠️ ${failedDecode} images failed to load in Puppeteer!`);
     } else {
       logger.info('✅ All images loaded successfully in browser.');
     }
@@ -240,7 +240,7 @@ async function generatePdf(db, bookId) {
 
       const pageInfo = await page.evaluate(async (index) => {
         const pages = document.querySelectorAll('.page');
-        let currentImgInfo = { src: 'none', visible: false, complete: false, decoded: false, width: 0 };
+        let currentImgInfo = { src: 'none', visible: false, complete: false, decoded: true, width: 0 };
 
         for (let idx = 0; idx < pages.length; idx++) {
           const p = pages[idx];
@@ -248,16 +248,6 @@ async function generatePdf(db, bookId) {
             p.style.display = 'block';
             const img = p.querySelector('img');
             if (img) {
-              try {
-                if (img.src && img.src !== 'none') {
-                  // WAIT FOR IMAGE TO FINISH DECODING PIXELS
-                  await img.decode();
-                  currentImgInfo.decoded = true;
-                }
-              } catch (e) {
-                currentImgInfo.decoded = false;
-                console.error(`IMAGE DECODE FAILED for ${img.src}:`, e.message);
-              }
               currentImgInfo.src = img.src.substring(0, 100) + '...';
               currentImgInfo.visible = img.offsetParent !== null;
               currentImgInfo.complete = img.complete;
@@ -272,7 +262,8 @@ async function generatePdf(db, bookId) {
 
       logger.info(`🎯 Slice ${i + 1} Diagnostic:`, pageInfo);
 
-      await sleep(500);
+      // Reduced sleep since images are pre-decoded
+      await sleep(50);
 
       const pagePdfBuffer = await page.pdf({
         width: '8in', height: '11in', printBackground: true,

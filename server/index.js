@@ -780,13 +780,20 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
 
     // Internal call should always hit the local Express port
     const internalUrl = `http://localhost:${port}`;
+    
+    // Increased timeout for internal PDF call to 10 minutes
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600000);
+
     const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ bookId }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
 
     if (!pdfResponse.ok) {
       throw new Error(`PDF generation failed: ${pdfResponse.statusText}`);
