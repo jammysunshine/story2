@@ -72,6 +72,13 @@ export default function SuccessPage() {
     // Set flag so MainCreator knows to refresh book state
     if (bookId) {
       localStorage.setItem('justPaid', 'true');
+      
+      // AUTO-DEEP LINK logic for Mobile
+      const isNative = Capacitor.isNativePlatform();
+      if (isNative) {
+        console.log('🚀 Attempting deep link return to app...');
+        window.location.href = `com.aistorytime.app://success?bookId=${bookId}`;
+      }
     }
   }, [bookId]);
 

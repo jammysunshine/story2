@@ -555,7 +555,7 @@ app.get('/api/book-status', async (req, res) => {
       signedPdfUrl = await get7DaySignedUrl(book.pdfUrl);
     }
 
-    console.log(`[DEBUG] /api/book-status for ${bookId}: status=${book.status}, pagesWithImages=${securedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length}`);
+    // console.log(`[DEBUG] /api/book-status for ${bookId}: status=${book.status}, pagesWithImages=${securedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length}`);
     res.json({ status: book.status, pages: securedPages, pdfUrl: signedPdfUrl });
   } catch (error) {
     logger.error(`Error in /api/book-status: ${error.message}`);
