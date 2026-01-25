@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "bridge": "adb reverse tcp:3001 tcp:3001 && adb reverse tcp:3000 tcp:3001",
+    "bridge:live": "adb reverse tcp:3000 tcp:3000",
     "dev:cloud": "VITE_API_URL=https://storytime-backend-959069445137.australia-southeast1.run.app/api vite",
     "build:cloud": "VITE_API_URL=https://storytime-backend-959069445137.australia-southeast1.run.app/api vite build",
     "switch:cloud": "npm run build:cloud && npx cap sync"
