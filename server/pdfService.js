@@ -137,6 +137,9 @@ async function generatePdf(db, bookId) {
       '--disable-web-security', `--user-data-dir=/tmp/chrome-${crypto.randomUUID()}`,
       '--disable-features=IsolateOrigins,site-per-process',
       '--disable-ipc-flooding-protection',
+      '--disable-background-networking',
+      '--disable-gcm',
+      '--disable-variations-service',
       '--js-flags="--max-old-space-size=512"'
     ],
   });

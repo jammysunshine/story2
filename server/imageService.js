@@ -311,7 +311,10 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
     const [heroRefUrl, animalRefUrl] = await Promise.all([
       generateReferenceImageRace(activeHeroBible, 'hero', bookRecord.photoUrl, bookRecord.characterStyle),
-      generateReferenceImageRace(activeAnimalBible, 'animal', null, bookRecord.characterStyle)
+      generateReferenceImageRace(activeAnimalBible, 'animal', null, bookRecord.characterStyle).catch(err => {
+        giLog.error(`⚠️ [ANIMAL_RACE_CRITICAL_FAIL] Using placeholder: ${err.message}`);
+        return 'https://via.placeholder.com/1024x1024.png?text=Brave+Animal+Friend';
+      })
     ]);
 
     giLog.info('🏗️ STEP 2: CONSTRUCTING MASTER ARRAY (27 Pages for DB + 1 Title Page in UI = 28 Total)');
