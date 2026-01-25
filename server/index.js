@@ -72,6 +72,14 @@ app.use(cors({
 }));
 // app.use((req, res, next) => { logger.info(`${req.method} ${req.url} from ${req.ip}`); next(); }); // Commented out to reduce log noise in production
 
+// --- DB CONNECTION MIDDLEWARE ---
+app.use((req, res, next) => {
+  if (!db && req.path !== '/health') {
+    return res.status(503).json({ error: 'Database initializing, please retry in a moment.' });
+  }
+  next();
+});
+
 const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
 const PRINT_PRICE_AMOUNT = parseInt(process.env.PRINT_PRICE_AMOUNT || '4999');

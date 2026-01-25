@@ -5,6 +5,10 @@ set -e
 
 echo "📦 Starting Release APK Generation..."
 
+# 0. Clean old APK
+echo "🧹 Removing old APK..."
+rm -f app/android/app/build/outputs/apk/release/app-release.apk
+
 # 1. Setup Java Environment (Required for Gradle)
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 export ANDROID_KEYSTORE_PASS="storytime123"
@@ -27,7 +31,7 @@ npx cap sync android
 # 5. Build the Signed APK
 echo "🔨 Compiling Signed Release APK..."
 cd android
-./gradlew assembleRelease
+./gradlew clean assembleRelease
 
 # 6. Restore capacitor.config.ts (Enable Live Reload for development)
 echo "🛠️ Restoring development settings (Live Reload)..."

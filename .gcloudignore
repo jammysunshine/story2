@@ -1,0 +1,37 @@
+# .gcloudignore
+# ==============================================================================
+# This file specifies which files should NOT be uploaded to Google Cloud Build.
+# It is much more effective than .dockerignore for reducing initial upload size.
+# ==============================================================================
+
+# Dependencies (THE BIGGEST OFFENDERS)
+**/node_modules/
+node_modules/
+app/node_modules/
+server/node_modules/
+
+# Android/iOS Build Artifacts
+app/android/
+app/ios/
+**/build/
+**/dist/
+*.apk
+*.aab
+*.keystore
+
+# Local Environment & Secrets
+.env
+.env.*
+.git/
+.gitignore
+.dockerignore
+gcp-key.json
+
+# OS Garbage
+**/.DS_Store
+Thumbs.db
+
+# Documentation/Mockups
+storytime-mockups/
+docs/
+scripts/

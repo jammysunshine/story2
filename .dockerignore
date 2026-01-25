@@ -1,15 +1,25 @@
 # Dependencies
-node_modules
+**/node_modules
+**/node_modules/
 npm-debug.log*
 
 # Build outputs
+**/dist
+**/dist/
+**/build
+**/build/
 .next
 out
-build
-dist
 .vercel
 
-# Local assets & documentation (Not needed in production container)
+# Mobile / Android (VERY LARGE - DO NOT UPLOAD)
+app/android/
+app/ios/
+*.apk
+*.aab
+*.keystore
+
+# Local assets & documentation
 storytime-mockups
 docs
 scripts
@@ -30,10 +40,9 @@ yarn-error.log*
 .git
 .gitignore
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.production
+gcp-key.json
 
 # OS files
 **/.DS_Store
