@@ -70,7 +70,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
 }));
-app.use((req, res, next) => { logger.debug(`${req.method} ${req.url} from ${req.ip}`); next(); });
+// app.use((req, res, next) => { logger.info(`${req.method} ${req.url} from ${req.ip}`); next(); }); // Commented out to reduce log noise in production
 
 const port = process.env.PORT || 3001;
 const TEASER_LIMIT = parseInt(process.env.STORY_TEASER_PAGES_COUNT || '7');
