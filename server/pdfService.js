@@ -127,6 +127,8 @@ async function generatePdf(db, bookId) {
   const browser = await puppeteer.launch({
     executablePath: chromePath,
     headless: 'new',
+    timeout: 60000,
+    dumpio: true,
     args: [
       '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
       '--disable-gpu', '--no-zygote', '--single-process', '--no-first-run',
