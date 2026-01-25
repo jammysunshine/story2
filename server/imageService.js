@@ -313,7 +313,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
       generateReferenceImageRace(activeHeroBible, 'hero', bookRecord.photoUrl, bookRecord.characterStyle),
       generateReferenceImageRace(activeAnimalBible, 'animal', null, bookRecord.characterStyle).catch(err => {
         giLog.error(`⚠️ [ANIMAL_RACE_CRITICAL_FAIL] Using placeholder: ${err.message}`);
-        return 'https://via.placeholder.com/1024x1024.png?text=Brave+Animal+Friend';
+        return 'https://via.placeholder.com/1024';
       })
     ]);
 
