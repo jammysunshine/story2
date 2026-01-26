@@ -499,7 +499,10 @@ app.get('/api/orders', async (req, res) => {
 
   try {
     logger.info(`🔍 [ORDER_FETCH] Fetching orders for email: ${email}`);
-    const orders = await db.collection('orders').find({ email }).sort({ createdAt: -1 }).toArray();
+    // FIX: The database field is 'userId', not 'email'. Use case-insensitive regex for robustness.
+    const orders = await db.collection('orders').find({ 
+      userId: { $regex: new RegExp("^" + email + "$", "i") } 
+    }).sort({ createdAt: -1 }).toArray();
     res.json({ success: true, orders });
   } catch (error) {
     logger.error('Error fetching orders:', error.message);

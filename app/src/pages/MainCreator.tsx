@@ -144,6 +144,16 @@ export default function MainCreator() {
       isDigitalUnlocked: boolean;
       createdAt: Date;
     }[];
+    lastShippingAddress?: {
+      firstName: string;
+      lastName: string;
+      addressLine1: string;
+      addressLine2: string;
+      city: string;
+      state: string;
+      postCode: string;
+      country: string;
+    };
   }
 
   const [user, setUser] = useState<User | null>(null)
@@ -645,6 +655,10 @@ export default function MainCreator() {
   const [reportData, setReportData] = useState({ pageNumber: 1, reason: '' });
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
   const reportContent = (pageNumber: number) => {
     setReportData({ pageNumber, reason: '' });
     setShowReportDialog(true);
@@ -674,23 +688,25 @@ export default function MainCreator() {
   };
 
   const deleteAccount = async () => {
-    const confirmation = window.prompt('CRITICAL: This will permanently delete your account, all your stories, and all your images. This action cannot be undone.\n\nType "DELETE" to confirm:');
-    
-    if (confirmation !== 'DELETE') {
-      toast({ title: "Deletion Cancelled", description: "Confirmation text did not match." });
+    if (deleteConfirmation !== 'DELETE') {
+      toast({ title: "Termination Aborted", description: "Confirmation text did not match.", variant: "destructive" });
       return;
     }
 
+    setIsDeletingAccount(true);
     try {
       const res = await axios.delete(`${API_URL}/user/account`, {
         headers: { Authorization: `Bearer ${user?.token}` }
       });
       if (res.data.success) {
-        toast({ title: "Account Deleted", description: "Your data has been removed." });
+        setShowDeleteDialog(false);
+        toast({ title: "Account Terminated", description: "Your data has been wiped." });
         logout();
       }
     } catch (e) {
-      toast({ title: "Deletion Failed", description: "Please try logging out and in again.", variant: "destructive" });
+      toast({ title: "Termination Failed", description: "Please try logging out and in again.", variant: "destructive" });
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -895,7 +911,10 @@ export default function MainCreator() {
           <button
             onClick={() => {
               setActiveTab('bookshelf');
-              if (user?.token) fetchLibrary(user.token);
+              if (user?.token) {
+                fetchLibrary(user.token);
+                fetchOrders(user.token);
+              }
             }}
             className={`px-4 md:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'bookshelf' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white'
               }`}
@@ -1440,54 +1459,75 @@ export default function MainCreator() {
         <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="flex justify-between items-center">
             <h2 className="text-5xl font-black uppercase tracking-tighter text-white">My Bookshelf</h2>
-            <div className="flex gap-4">
-              <Sheet onOpenChange={(open) => open && fetchOrders()}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" className="rounded-2xl border-white/5 text-slate-400 hover:text-white bg-slate-900/50 h-14 px-6 font-black uppercase tracking-widest text-[10px]">
-                    <Package size={18} className="mr-3" /> Recent Orders
-                    {orders.length > 0 && <span className="ml-3 w-2 h-2 bg-primary rounded-full animate-pulse" />}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="bg-slate-900 border-white/5 text-white w-full sm:max-w-md z-[100]">
-                  <SheetHeader className="pb-6 border-b border-white/5">
-                    <SheetTitle className="text-white font-black uppercase flex items-center gap-2">
-                      <Package className="text-primary" /> Your Orders
-                    </SheetTitle>
-                  </SheetHeader>
-                  <div className="py-6 space-y-4 overflow-y-auto max-h-[80vh]">
-                    {ordersLoading ? (
-                      <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
-                    ) : orders.length === 0 ? (
-                      <div className="text-center py-12 text-slate-500 font-bold uppercase text-xs tracking-widest">No orders yet</div>
-                    ) : (
-                      orders.map((order) => (
-                        <div key={order._id} className="bg-slate-800/50 p-5 rounded-2xl border border-white/5 space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-black text-sm uppercase tracking-tight">Hardcover Book</h4>
-                              <p className="text-[10px] text-slate-500 font-bold uppercase">{new Date(order.createdAt).toLocaleDateString()}</p>
-                            </div>
-                            <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${order.status === 'Shipped' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'
-                              }`}>
-                              {order.status}
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-end">
-                            <p className="font-black text-primary text-lg">${order.amount.toFixed(2)}</p>
-                            {order.trackingUrl && (
-                              <a href={order.trackingUrl} target="_blank" className="flex items-center gap-1 text-[10px] font-black text-blue-400 hover:underline">
-                                TRACKING <ExternalLink size={10} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
           </div>
+
+          {/* Active Deliveries Tracker */}
+          {(() => {
+            // Combine real orders with "in-progress" books from library
+            const activeLibraryBooks = library.filter(b => ['paid', 'illustrated', 'printing'].includes(b.status));
+            const hasActiveDeliveries = orders.length > 0 || activeLibraryBooks.length > 0;
+
+            if (!hasActiveDeliveries) return null;
+
+            return (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <Package className="text-primary w-5 h-5" />
+                  <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-500">Active Deliveries</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Show books currently being painted/processed first */}
+                  {activeLibraryBooks.map((b) => (
+                    <div key={`proc-${b._id}`} className="bg-slate-900/50 p-6 rounded-[2rem] border border-blue-500/30 flex items-center gap-6 shadow-xl relative overflow-hidden group">
+                      <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center shrink-0">
+                        <Palette className="text-blue-400 w-8 h-8 animate-pulse" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black uppercase text-blue-500 tracking-wider mb-1">Processing Magic</p>
+                        <h4 className="text-sm font-bold text-white truncate">{b.title}</h4>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase bg-blue-500/20 text-blue-400 animate-pulse">
+                            {b.status === 'printing' ? 'Preparing Print' : 'Painting Images...'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Show official orders */}
+                  {orders.map((order) => (
+                    <div key={order._id} className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 flex items-center gap-6 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-all">
+                      <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
+                        <Package className="text-primary w-8 h-8" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Hardcover Storybook</p>
+                        <h4 className="text-sm font-bold text-white truncate">Ordered {new Date(order.createdAt).toLocaleDateString()}</h4>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase ${
+                            order.status === 'Shipped' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {order.status}
+                          </span>
+                          <p className="text-[10px] font-black text-primary">${order.amount.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      {order.trackingUrl && (
+                        <a 
+                          href={order.trackingUrl} 
+                          target="_blank" 
+                          className="absolute top-4 right-4 text-blue-400 hover:text-blue-300 transition-colors"
+                          title="Track Shipment"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {!user ? (
             <div className="bg-slate-900/50 p-20 rounded-[3rem] border border-dashed border-white/10 text-center space-y-8">
@@ -1592,26 +1632,41 @@ export default function MainCreator() {
                 <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Adventurer Statistics</h3>
                 <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-2">
-                    <p className="text-4xl font-black text-white">{user?.recentBooks?.length || 0}</p>
+                    <p className="text-4xl font-black text-white">{library.length}</p>
                     <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Adventures</p>
                   </div>
                   <div className="space-y-2 border-x border-white/5 px-2">
-                    <p className="text-4xl font-black text-primary">{user?.recentBooks?.filter(b => b.isDigitalUnlocked).length || 0}</p>
+                    <p className="text-4xl font-black text-primary">{library.filter(b => b.isDigitalUnlocked || b.pdfUrl).length}</p>
                     <p className="text-[10px] font-black uppercase text-primary/70 tracking-widest">Unlocked</p>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-4xl font-black text-white">{orders?.length || 0}</p>
+                    <p className="text-4xl font-black text-white">{orders.length}</p>
                     <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Physical</p>
                   </div>
                 </div>
               </div>
+
+              {user?.lastShippingAddress && (
+                <div className="bg-slate-950/50 p-10 rounded-[2.5rem] border border-white/5 space-y-6 text-left">
+                  <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Last Shipping Address</h3>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-white">{user.lastShippingAddress.firstName} {user.lastShippingAddress.lastName}</p>
+                    <p className="text-xs text-slate-400">{user.lastShippingAddress.addressLine1}</p>
+                    {user.lastShippingAddress.addressLine2 && <p className="text-xs text-slate-400">{user.lastShippingAddress.addressLine2}</p>}
+                    <p className="text-xs text-slate-400">
+                      {user.lastShippingAddress.city}, {user.lastShippingAddress.state} {user.lastShippingAddress.postCode}
+                    </p>
+                    <p className="text-[10px] font-black uppercase text-slate-600 mt-2">{user.lastShippingAddress.country}</p>
+                  </div>
+                </div>
+              )}
 
               {user ? (
                 <div className="space-y-4">
                   <button onClick={logout} className="w-full h-20 bg-white/5 text-white/50 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:bg-white/10 hover:text-white transition-all border border-white/5 flex items-center justify-center gap-3 active:scale-95 group">
                     Logout and End Session
                   </button>
-                  <button onClick={deleteAccount} className="w-full h-14 bg-red-500/5 text-red-500/50 rounded-xl font-black uppercase tracking-[0.2em] text-[8px] hover:bg-red-500/10 hover:text-red-500 transition-all border border-red-500/10 flex items-center justify-center gap-3 active:scale-95 group">
+                  <button onClick={() => setShowDeleteDialog(true)} className="w-full h-14 bg-red-500/5 text-red-500/50 rounded-xl font-black uppercase tracking-[0.2em] text-[8px] hover:bg-red-500/10 hover:text-red-500 transition-all border border-red-500/10 flex items-center justify-center gap-3 active:scale-95 group">
                     <Trash2 size={12} className="group-hover:animate-bounce" /> Delete My Account & Data
                   </button>
                   <a href="/privacy" target="_blank" className="block text-[8px] font-black uppercase text-slate-600 hover:text-primary transition-colors text-center tracking-widest">
@@ -1694,6 +1749,52 @@ export default function MainCreator() {
                 className="w-full py-2 text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
               >
                 Dismiss
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ominous Account Termination Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-md bg-slate-950 border-red-900/50 text-white rounded-[2rem] shadow-[0_0_50px_rgba(220,38,38,0.15)]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-red-500 text-center flex items-center justify-center gap-2">
+              <Trash2 size={24} /> Account Termination
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-6 space-y-6">
+            <div className="bg-red-950/20 p-6 rounded-2xl border border-red-900/30 text-center">
+              <p className="text-red-200/70 text-xs font-bold uppercase tracking-widest leading-relaxed">
+                This process is irreversible. All of your stories, images, and profile data will be permanently wiped from our secure vault.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Confirm Identity</label>
+              <p className="text-[10px] text-slate-400 mb-2">Please type <span className="text-red-500 font-black italic">DELETE</span> to confirm your intent.</p>
+              <input 
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                className="w-full h-16 bg-slate-900 rounded-2xl text-center text-xl font-black outline-none border-2 border-transparent focus:border-red-600/50 transition-all placeholder:text-slate-800"
+                placeholder="---"
+              />
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button 
+                onClick={deleteAccount}
+                disabled={isDeletingAccount || deleteConfirmation !== 'DELETE'}
+                className="w-full h-16 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all disabled:opacity-20"
+              >
+                {isDeletingAccount ? <Loader2 className="animate-spin" /> : "Terminate Account"}
+              </Button>
+              <button 
+                onClick={() => setShowDeleteDialog(false)}
+                className="w-full py-2 text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+              >
+                Cancel and Stay
               </button>
             </div>
           </div>
