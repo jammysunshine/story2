@@ -731,6 +731,79 @@ export default function MainCreator() {
     );
   };
 
+  const tapCountRef = useRef(0);
+  const tapTimeoutRef = useRef<number | null>(null);
+
+  const activateReviewerMode = async () => {
+    console.warn('🕵️‍♀️ Activating Reviewer Test Mode...');
+    const reviewerBookId = import.meta.env.VITE_REVIEWER_BOOK_ID;
+    let loadedBook: Book | null = null;
+
+    if (reviewerBookId) {
+      toast({
+        title: "🕵️‍♀️ Loading Reviewer Book...",
+        description: `Attempting to fetch real book: ${reviewerBookId}`,
+        duration: 3000,
+      });
+      try {
+        // Attempt to fetch a real book from the backend
+        const res = await axios.get(`${API_URL}/book-status?bookId=${reviewerBookId}`, {
+          headers: { Authorization: user?.token ? `Bearer ${user.token}` : '' }
+        });
+        loadedBook = { ...res.data, bookId: reviewerBookId, status: 'pdf_ready', isDigitalUnlocked: true };
+        toast({
+          title: "🕵️‍♀️ Reviewer Test Mode Activated",
+          description: `Loaded real book: ${loadedBook.title}`,
+          duration: 5000,
+        });
+      } catch (error) {
+        console.error('Failed to fetch reviewer book, falling back to dummy:', error);
+        toast({
+          title: "⚠️ Reviewer Mode Fallback",
+          description: "Failed to load real book, using dummy content.",
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    }
+
+    if (!loadedBook) {
+      // Fallback to dummy book if no reviewerBookId or fetch failed
+      const dummyBookId = 'reviewer-test-book-' + Date.now();
+      const dummyPdfUrl = 'https://www.africau.edu/images/default/sample.pdf'; // Sample PDF
+
+      loadedBook = {
+        _id: dummyBookId,
+        bookId: dummyBookId,
+        title: "The Reviewer's Grand Adventure",
+        childName: "Gemini",
+        status: "pdf_ready",
+        photoUrl: "https://via.placeholder.com/150/FF0000/FFFFFF?text=REVIEWER",
+        pdfUrl: dummyPdfUrl,
+        isDigitalUnlocked: true,
+        pages: Array.from({ length: 23 }, (_, i) => ({
+          pageNumber: i + 1,
+          text: `In a land far away, the brave hero Gemini embarked on an adventure. On page ${i + 1}, our hero discovered a magical artifact!`,
+          prompt: `Reviewer test prompt for page ${i + 1}`,
+          imageUrl: `https://via.placeholder.com/600x800/00FF00/000000?text=Page+${i + 1}`
+        })),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      toast({
+        title: "🕵️‍♀️ Reviewer Test Mode Activated",
+        description: "A dummy 'PDF Ready' book has been loaded.",
+        duration: 5000,
+      });
+    }
+
+    // Log the final loadedBook for debugging
+    console.log("🐛 Reviewer Mode: Final loadedBook object:", loadedBook);
+
+    setBook(loadedBook);
+    setStep(3); // Jump to the preview/payment step
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6 font-sans pb-20">
       {/* PDF Ready Toast */}
@@ -763,7 +836,26 @@ export default function MainCreator() {
 
       <header className="flex flex-col md:flex-row justify-between items-center mb-12 pt-[env(safe-area-inset-top)] gap-6">
         <h1
-          onClick={resetCreator}
+          onClick={() => {
+            tapCountRef.current += 1;
+            if (tapTimeoutRef.current) {
+              clearTimeout(tapTimeoutRef.current);
+            }
+
+            if (tapCountRef.current === 3) {
+              console.log("Triple tap detected!");
+              tapCountRef.current = 0; // Reset immediately after triple tap
+              if (tapTimeoutRef.current) {
+                clearTimeout(tapTimeoutRef.current);
+              }
+              activateReviewerMode(); // Call the new function
+            } else {
+              tapTimeoutRef.current = setTimeout(() => {
+                tapCountRef.current = 0;
+                resetCreator(); // Reset if not a triple tap within the timeout
+              }, 300);
+            }
+          }}
           className="text-2xl font-black tracking-tighter uppercase text-primary flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
         >
           <BookOpen className="text-primary" /> WonderStories
@@ -940,7 +1032,9 @@ export default function MainCreator() {
           )}
 
           {step === 3 && book && (
-            <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
+            <>
+              {(() => { console.log("🐛 MainCreator (Step 3): Rendering with book:", book); return null; })()}
+              <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
               {/* Check if we're in the painting phase (not all teaser images are done yet) */}
               {(book.status === 'generating' || book.status === 'teaser_generating' || book.status === 'preview' ||
                 (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
