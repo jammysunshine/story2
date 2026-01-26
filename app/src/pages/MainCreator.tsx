@@ -1020,13 +1020,22 @@ export default function MainCreator() {
                 <h2 className="text-3xl font-black uppercase text-white">{book.title}</h2>
                 <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2">Draft Preview</p>
               </div>
-              <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 max-h-[50vh] overflow-y-auto space-y-8 shadow-inner custom-scrollbar">
+              <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 max-h-[50vh] overflow-y-auto space-y-8 shadow-inner custom-scrollbar relative">
                 {book.pages?.map((p: BookPage) => (
                   <div key={p.pageNumber} className="relative pl-8">
                     <span className="absolute left-0 top-0 text-[10px] font-black text-primary opacity-50">{p.pageNumber}</span>
                     <p className="text-xl text-slate-200 italic leading-relaxed">"{p.text}"</p>
                   </div>
                 ))}
+                
+                <div className="pt-8 border-t border-white/5 flex justify-center">
+                  <button
+                    onClick={() => reportContent(1)}
+                    className="text-slate-600 hover:text-red-400 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+                  >
+                    <Flag size={12} /> Report Inappropriate Story Content
+                  </button>
+                </div>
               </div>
               <button onClick={startPainting} disabled={loading} className="w-full h-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-blue-500/30 hover:scale-[1.02]">
                 {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
