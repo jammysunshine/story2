@@ -69,11 +69,13 @@ async function callGeminiImageGen(params) {
         }
       }
 
-      log.info(`📡 [Page ${pageNumber}] Sending Gemini request (Prompt length: ${prompt.length}, Parts: ${parts.length})...`, { pageNumber, promptLength: prompt.length, partsCount: parts.length });
+      log.info(`📡 [Page ${pageNumber}] Sending Gemini request (Prompt length: ${prompt.length}, Parts: ${parts.length})...`, { pageNumber, promptLength: prompt.length, partsCount: parts.length, hasReferenceImages: hasImages });
 
       parts.forEach((part, idx) => {
         if (part.inlineData) {
-          log.info(`📦 Part ${idx} size: ${Math.round(part.inlineData.data.length / 1024)} KB`, { pageNumber, partIdx: idx, size: part.inlineData.data.length });
+          log.info(`📦 Part ${idx} [IMAGE]: mimeType=${part.inlineData.mimeType}, size=${Math.round(part.inlineData.data.length / 1024)} KB`, { pageNumber, partIdx: idx, size: part.inlineData.data.length });
+        } else {
+          log.info(`📦 Part ${idx} [TEXT]: content snippet="${part.text.substring(0, 50)}..."`, { pageNumber, partIdx: idx });
         }
       });
 
@@ -121,7 +123,7 @@ async function callGeminiImageGen(params) {
 
       const response = geminiResult;
       if (response && response.candidates?.[0]?.finishReason === 'SAFETY') {
-        log.error(`🛡️ SAFETY ALERT: Page ${pageNumber} Gemini prompt was blocked.`, { pageNumber });
+        log.error(`🛡️ SAFETY ALERT: Page ${pageNumber} Gemini prompt was blocked by safety filters.`, { pageNumber, fullResponse: JSON.stringify(response) });
         return { error: 'SAFETY_FILTER_BLOCK', status: 200, modelUsed: 'gemini' };
       }
 
@@ -140,6 +142,8 @@ async function callGeminiImageGen(params) {
       log.warn(`⚠️ [Page ${pageNumber}] Gemini Pro did not return an image.`, {
         pageNumber,
         finishReason: candidate?.finishReason,
+        finishMessage: candidate?.finishMessage,
+        safetyRatings: JSON.stringify(candidate?.safetyRatings),
         partsCount: candidate?.content?.parts?.length,
         hasContent: !!candidate?.content,
         prompt: prompt
@@ -157,7 +161,6 @@ async function callGeminiImageGen(params) {
       status: isOverloaded ? 503 : 500
     };
   }
-}
 }
 
 async function generateImages(db, bookId, isFulfillment = false) {
@@ -434,16 +437,17 @@ async function generateImages(db, bookId, isFulfillment = false) {
 
       if (isActuallyPainted) {
         // Final Guard: Check GCS for the actual file
+        giLog.info(`🔍 [Page ${page.pageNumber}] Checking GCS for existing file: ${gcsFileName}...`, { gcsFileName });
         const [exists] = await bucket.file(gcsFileName).exists();
         if (exists) {
-          giLog.info(`⏭️ [Page ${page.pageNumber}] Skipping (verified in GCS at ${gcsFileName})`);
+          giLog.info(`⏭️ [Page ${page.pageNumber}] Skipping (verified in GCS at ${gcsFileName})`, { gcsFileName });
           try {
             const publicUrl = `https://storage.googleapis.com/${process.env.GCS_IMAGES_BUCKET_NAME}/${gcsFileName}`;
             await db.collection('images').updateOne({ bookId: new ObjectId(bookId), pageNumber: page.pageNumber }, { $set: { gcsUrl: publicUrl, updatedAt: new Date(), model: 'previously_painted' } }, { upsert: true });
           } catch (e) { giLog.error(`❌ Sync error for Page ${page.pageNumber}`, e); }
           return true;
         } else {
-          giLog.warn(`⚠️ [Page ${page.pageNumber}] DB says painted but GCS file missing at ${gcsFileName}. Re-painting.`);
+          giLog.warn(`⚠️ [Page ${page.pageNumber}] DB says painted but GCS file missing at ${gcsFileName}. Proceeding to re-paint.`, { gcsFileName });
         }
       }
 
