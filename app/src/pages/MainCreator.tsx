@@ -972,7 +972,7 @@ export default function MainCreator() {
           {/* Active Deliveries Tracker */}
           <OrderTracker 
             orders={orders}
-            activeLibraryBooks={library.filter(b => ['paid', 'illustrated', 'printing'].includes(b.status))}
+            activeLibraryBooks={library.filter(b => ['paid', 'illustrated', 'printing'].includes(b.status || ''))}
           />
 
           {!user ? (
