@@ -19,6 +19,15 @@ interface FormData {
   occasion: string;
 }
 
+interface Options {
+  genders: string[];
+  skinTones: string[];
+  hairStyles: string[];
+  hairColors: string[];
+  styles: string[];
+  locations: string[];
+}
+
 interface Step1HeroProps {
   loading: boolean;
   formData: FormData;
@@ -30,7 +39,7 @@ interface Step1HeroProps {
   setPhotoUrl: (url: string) => void;
   onGenerate: () => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
-  options: any;
+  options: Options;
   randomAnimals: string[];
   randomLessons: string[];
 }

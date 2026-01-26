@@ -728,22 +728,6 @@ export default function MainCreator() {
   };
 
 
-
-  const renderSelect = (label: string, field: keyof typeof formData, choices: string[]) => (
-    <div>
-      <label className="text-[10px] font-black text-slate-500 uppercase ml-1">{label}</label>
-      <select
-        value={formData[field]}
-        onChange={e => setFormData({ ...formData, [field]: e.target.value })}
-        className="w-full bg-slate-800 rounded-xl h-12 px-4 outline-none font-bold text-sm border border-transparent focus:border-primary/30 transition-all shadow-sm focus:shadow-lg focus:shadow-primary/10"
-      >
-        {choices.map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
-    </div>
-  )
-
-
-
   const tapCountRef = useRef(0);
   const tapTimeoutRef = useRef<number | null>(null);
 

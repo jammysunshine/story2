@@ -9,9 +9,17 @@ interface BookPage {
 }
 
 interface Book {
+  bookId?: string;
   status: string;
   pdfUrl?: string;
   pages?: BookPage[];
+}
+
+interface LibraryBook {
+  _id: string;
+  title: string;
+  status: string;
+  pdfUrl?: string;
 }
 
 interface Step3PaintingProps {
@@ -20,12 +28,12 @@ interface Step3PaintingProps {
   isPaid: boolean;
   progress: number;
   fullProgress: number;
-  onReportContent: (pageNumber: number) => void;
+  onReportContent: (pageNumber: number, bookId?: string) => void;
   onStartParentalGate: () => void;
   checkoutLoading: boolean;
   bookCost: string;
   baseCurrency: string;
-  library: any[];
+  library: LibraryBook[];
 }
 
 export function Step3Painting({
@@ -48,6 +56,7 @@ export function Step3Painting({
         (book.status !== 'teaser_ready' && progress < 100)) ? (
         // Show centralized loading animation when teaser images are being generated
         <div className="py-20 text-center space-y-10">
+          {(() => { console.log("DEBUG: Rendering teaser generation animation. Status:", book.status, "Progress:", progress); return null; })()}
           <MagicGlow color="pink" />
           <div className="space-y-4">
             <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
@@ -80,6 +89,7 @@ export function Step3Painting({
       ) : book.status === 'paid' && fullProgress < 100 ? (
         // Show centralized loading animation when full book images are being generated after payment
         <div className="py-20 text-center space-y-10">
+          {(() => { console.log("DEBUG: Rendering full book generation animation. Status:", book.status, "Full progress:", fullProgress); return null; })()}
           <MagicGlow color="blue" />
           <div className="space-y-4">
             <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
@@ -96,6 +106,7 @@ export function Step3Painting({
       ) : book.status === 'paid' && !book.pdfUrl ? (
         // Show loading animation when PDF is being generated
         <div className="py-20 text-center space-y-10">
+          {(() => { console.log("DEBUG: Rendering PDF generation animation. Status:", book.status, "PDF URL exists:", !!book.pdfUrl); return null; })()}
           <MagicGlow color="amber" />
           <div className="space-y-4">
             <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
@@ -104,13 +115,14 @@ export function Step3Painting({
           <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000 ease-out"
-              style={{ width: '75%' }}
+              style={{ width: '75%' }} // PDF generation is typically quick once images are ready
             />
           </div>
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">EST. TIME: 6-8 MINS
           </p>
         </div>
       ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
+
         // Show loading animation when PDF is being prepared for download
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="green" />
@@ -184,7 +196,7 @@ export function Step3Painting({
                 </div>
                 <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg relative">
                   <button
-                    onClick={() => onReportContent(p.pageNumber)}
+                    onClick={() => onReportContent(p.pageNumber, book.bookId)}
                     className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1 opacity-20 hover:opacity-100"
                   >
                     <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Content
