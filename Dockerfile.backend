@@ -85,7 +85,8 @@ COPY --from=deps --chown=node:node /build/node_modules ./node_modules
 # Copy built frontend assets to 'public_html'
 COPY --from=frontend-builder --chown=node:node /app-build/dist ./public_html
 
-# Copy ALL server files into /app
+# Copy policies and server files
+COPY --chown=node:node POLICIES.md ./
 COPY --chown=node:node server/ ./
 
 # Ensure permissions
