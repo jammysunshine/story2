@@ -6,6 +6,7 @@ interface BookPage {
 }
 
 interface Book {
+  bookId?: string;
   title?: string;
   pages?: BookPage[];
 }
@@ -15,7 +16,7 @@ interface Step2PreviewProps {
   onStartPainting: () => void;
   loading: boolean;
   onEdit: () => void;
-  onReportContent: (pageNumber: number) => void;
+  onReportContent: (pageNumber: number, bookId?: string) => void;
 }
 
 export function Step2Preview({
@@ -41,7 +42,7 @@ export function Step2Preview({
         
         <div className="pt-12 pb-4 flex justify-center">
           <button
-            onClick={() => onReportContent(1)}
+            onClick={() => onReportContent(1, book.bookId)}
             className="text-slate-600 hover:text-red-400 text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 opacity-20 hover:opacity-100"
           >
             <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Story Content
