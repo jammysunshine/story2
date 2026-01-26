@@ -1,4 +1,4 @@
-import { Sparkles, Wand2, Loader2, Camera, Trash2 } from 'lucide-react';
+import { Sparkles, Wand2, Loader2, Camera, Trash2, BookOpen } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Separator } from '../UIComponents';
@@ -42,6 +42,7 @@ interface Step1HeroProps {
   options: Options;
   randomAnimals: string[];
   randomLessons: string[];
+  randomOccasions: string[];
 }
 
 export function Step1Hero({
@@ -58,6 +59,7 @@ export function Step1Hero({
   options,
   randomAnimals,
   randomLessons,
+  randomOccasions,
 }: Step1HeroProps) {
   const renderSelect = (label: string, field: keyof FormData, choices: string[]) => (
     <div>
@@ -172,6 +174,7 @@ export function Step1Hero({
           {renderSelect('Art Style', 'characterStyle', options.styles)}
           {renderSelect('Story Location', 'location', options.locations)}
           {renderSelect('Life Lesson', 'lesson', randomLessons)}
+          {renderSelect('Story Occasion', 'occasion', randomOccasions)}
         </div>
       </div>
 

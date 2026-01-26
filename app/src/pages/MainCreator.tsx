@@ -667,6 +667,10 @@ export default function MainCreator() {
   const [reportData, setReportData] = useState({ pageNumber: 1, reason: '', bookId: '' });
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
   const reportContent = (pageNumber: number, specificBookId?: string) => {
     setReportData({ 
       pageNumber, 
@@ -935,6 +939,8 @@ export default function MainCreator() {
                           randomAnimals={randomAnimals}
 
                           randomLessons={randomLessons}
+
+                          randomOccasions={randomOccasions}
 
                         />
 
