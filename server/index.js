@@ -569,8 +569,9 @@ app.get('/api/book-status', async (req, res) => {
 
 app.post('/api/generate-pdf', async (req, res) => {
   const { bookId } = req.body;
+  const isRescue = req.headers['x-is-rescue-retry'] === 'true';
   try {
-    logger.info(`📄 [PDF_GEN] Starting generation for Book: ${bookId}`);
+    logger.info(`📄 [PDF_GEN] Starting generation for Book: ${bookId}${isRescue ? ' (RESCUE ATTEMPT)' : ''}`);
     const pdfUrl = await generatePdf(db, bookId);
     const signedUrl = await get7DaySignedUrl(pdfUrl);
 
@@ -776,27 +777,80 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
 
     // Internal call should always hit the local Express port
     const internalUrl = `http://localhost:${port}`;
-    
-    // Increased timeout for internal PDF call to 10 minutes
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600000);
+    let finalPdfUrl = '';
+    let success = false;
 
-    const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ bookId }),
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
+    // ATTEMPT 1: Internal Path (Fastest)
+    try {
+      logger.info(`📡 [PDF_TRIGGER] Attempt 1: Internal call to ${internalUrl}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min
 
-    if (!pdfResponse.ok) {
-      throw new Error(`PDF generation failed: ${pdfResponse.statusText}`);
+      const pdfResponse = await fetch(`${internalUrl}/api/generate-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (pdfResponse.ok) {
+        const result = await pdfResponse.json();
+        finalPdfUrl = result.pdfUrl;
+        success = true;
+        logger.info(`✅ [PDF_TRIGGER] Internal call succeeded.`);
+      } else {
+        logger.warn(`⚠️ [PDF_TRIGGER] Internal call failed with status: ${pdfResponse.status}`);
+      }
+    } catch (err) {
+      logger.error({ err }, `❌ [PDF_TRIGGER] Internal call error`);
     }
 
-    const { pdfUrl } = await pdfResponse.json();
-    logger.info(`✅ PDF generated successfully: ${pdfUrl}`);
+    // ATTEMPT 2-4: Public Rescue Path (Only in GCloud production)
+    if (!success && process.env.K_SERVICE) {
+      const publicUrl = process.env.APP_URL;
+      const MAX_RESCUE_ATTEMPTS = 3;
+      
+      for (let attempt = 1; attempt <= MAX_RESCUE_ATTEMPTS; attempt++) {
+        try {
+          logger.info(`🚀 [PDF_RESCUE] Starting Rescue Attempt ${attempt}/${MAX_RESCUE_ATTEMPTS} in 15s...`);
+          await new Promise(r => setTimeout(r, 15000)); // 15s cooldown
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 min
+
+          const rescueResponse = await fetch(`${publicUrl}/api/generate-pdf`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'x-is-rescue-retry': 'true'
+            },
+            body: JSON.stringify({ bookId }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (rescueResponse.ok) {
+            const result = await rescueResponse.json();
+            finalPdfUrl = result.pdfUrl;
+            success = true;
+            logger.info(`✅ [PDF_RESCUE] Rescue Attempt ${attempt} SUCCEEDED!`);
+            break;
+          } else {
+            logger.error(`❌ [PDF_RESCUE] Rescue Attempt ${attempt} failed: ${rescueResponse.status}`);
+          }
+        } catch (rescueErr) {
+          logger.error({ err: rescueErr }, `💥 [PDF_RESCUE] Rescue Attempt ${attempt} error`);
+        }
+      }
+    }
+
+    if (!success) {
+      throw new Error(`PDF generation failed after all internal and rescue attempts.`);
+    }
+
+    const pdfUrl = finalPdfUrl;
+    logger.info(`✅ Final PDF ready: ${pdfUrl}`);
 
     // 3. Trigger Gelato fulfillment ONLY for physical books
     if (type === 'book') {

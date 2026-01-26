@@ -608,11 +608,53 @@ async function generateImages(db, bookId, isFulfillment = false) {
         giLog.info(`🎯 [GenerateImages][PID:${pid}] Dashboard Sync: Triggered for ${userEmail}`);
       }
 
-      // SMART PDF TRIGGER
+      // SMART PDF TRIGGER (1 Internal + 3 External Rescue)
       if (pagesToProcessCount === masterPages.length && !isFulfillment) {
-        const internalUrl = `http://localhost:${process.env.PORT || 3001}`;
-        giLog.info(`🚀 Triggering background PDF generation for book: ${bookId}`);
-        axios.post(`${internalUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed', e));
+        (async () => {
+          const internalUrl = `http://localhost:${process.env.PORT || 3001}`;
+          let success = false;
+
+          // ATTEMPT 1: Internal Path
+          try {
+            giLog.info(`🚀 [AUTO_PDF] Attempt 1: Internal call to ${internalUrl}`);
+            const response = await axios.post(`${internalUrl}/api/generate-pdf`, { bookId }, { timeout: 600000 });
+            if (response.status === 200) {
+              success = true;
+              giLog.info(`✅ [AUTO_PDF] Internal call succeeded.`);
+            }
+          } catch (err) {
+            giLog.error(`⚠️ [AUTO_PDF] Internal call failed`, err);
+          }
+
+          // ATTEMPT 2-4: Public Rescue Path (Only in GCloud production)
+          if (!success && process.env.K_SERVICE) {
+            const publicUrl = process.env.APP_URL;
+            const MAX_RESCUE_ATTEMPTS = 3;
+            
+            for (let attempt = 1; attempt <= MAX_RESCUE_ATTEMPTS; attempt++) {
+              try {
+                giLog.info(`🚀 [AUTO_PDF_RESCUE] Starting Rescue Attempt ${attempt}/${MAX_RESCUE_ATTEMPTS} in 15s...`);
+                await new Promise(r => setTimeout(r, 15000));
+
+                const rescueResponse = await axios.post(`${publicUrl}/api/generate-pdf`, 
+                  { bookId }, 
+                  { 
+                    headers: { 'x-is-rescue-retry': 'true' },
+                    timeout: 600000 
+                  }
+                );
+
+                if (rescueResponse.status === 200) {
+                  success = true;
+                  giLog.info(`✅ [AUTO_PDF_RESCUE] Rescue Attempt ${attempt} SUCCEEDED!`);
+                  break;
+                }
+              } catch (rescueErr) {
+                giLog.error(`💥 [AUTO_PDF_RESCUE] Rescue Attempt ${attempt} failed`, rescueErr);
+              }
+            }
+          }
+        })();
       }
 
       const pagesWithImages = updatedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
