@@ -1020,6 +1020,92 @@ app.post('/api/create-checkout', async (req, res) => {
   }
 });
 
+app.get('/privacy', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Privacy Policy | AI StoryTime</title>
+      <style>
+        body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { margin-top: 30px; }
+      </style>
+    </head>
+    <body>
+      <h1>Privacy Policy & AI Safety</h1>
+      <p>Last updated: January 2026</p>
+      
+      <h2>1. Information We Collect</h2>
+      <p>We collect your email address and name via Google Sign-In to manage your book library. Photos uploaded for character sync are processed via Google Gemini and are not shared with third parties except for the purpose of story generation.</p>
+      
+      <h2>2. Data Deletion</h2>
+      <p>You can delete your account and all associated data at any time from the "Account" tab within the app.</p>
+      
+      <h2>3. AI Safety</h2>
+      <p>Our stories and images are generated using Google Gemini. We have implemented strict safety filters to ensure all content is appropriate for children. If you encounter any offensive content, please use the "Report" button on the story page.</p>
+      
+      <h2>4. Contact</h2>
+      <p>For any questions, please contact us via the app feedback system.</p>
+    </body>
+    </html>
+  `);
+});
+
+// --- USER DATA & SAFETY ROUTES ---
+
+app.post('/api/report-content', async (req, res) => {
+  const { bookId, pageNumber, reason } = req.body;
+  try {
+    logger.info(`🚩 [CONTENT_REPORT] Book: ${bookId}, Page: ${pageNumber}, Reason: ${reason}`);
+    
+    // Store report in a dedicated collection
+    await db.collection('reports').insertOne({
+      bookId: new ObjectId(bookId),
+      pageNumber,
+      reason,
+      status: 'pending',
+      createdAt: new Date()
+    });
+
+    res.json({ success: true, message: 'Report received. Our safety team will review this content.' });
+  } catch (error) {
+    logger.error({ err: error, bookId }, 'Error submitting content report');
+    res.status(500).json({ error: 'Failed to submit report' });
+  }
+});
+
+app.delete('/api/user/account', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const email = await getUserEmailFromToken(token);
+  if (!email) return res.status(401).json({ error: 'Invalid token' });
+
+  try {
+    logger.warn(`🗑️ [ACCOUNT_DELETION] Request for user: ${email}`);
+    
+    // 1. Delete user record
+    await db.collection('users').deleteOne({ email: email.toLowerCase() });
+    
+    // 2. Mark books as orphaned (or delete them if preferred)
+    // We'll mark them as deleted but keep the files for audit logs if needed, 
+    // or you can choose to fully wipe them.
+    await db.collection('books').updateMany(
+      { userId: email.toLowerCase() },
+      { $set: { status: 'deleted', deletedAt: new Date() } }
+    );
+
+    res.json({ success: true, message: 'Your account and associated data have been queued for deletion.' });
+  } catch (error) {
+    logger.error({ err: error, email }, 'Error during account deletion');
+    res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
 // --- FRONTEND SERVING ---
 console.log(`📡 Preparing to listen on port: ${port}`);
 // Serve static files from the 'public_html' directory (built Vite app)

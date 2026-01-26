@@ -28,10 +28,10 @@ npm run build
 echo "🔄 Syncing assets to Android project..."
 npx cap sync android
 
-# 5. Build the Signed APK
-echo "🔨 Compiling Signed Release APK..."
+# 5. Build the Signed APK and AAB
+echo "🔨 Compiling Signed Release Artifacts (APK and AAB)..."
 cd android
-./gradlew clean assembleRelease
+./gradlew clean assembleRelease bundleRelease
 
 # 6. Restore capacitor.config.ts (Enable Live Reload for development)
 echo "🛠️ Restoring development settings (Live Reload)..."
@@ -39,8 +39,9 @@ cd ../..
 sed -i '' 's|// url: '\''http://localhost:3000'\''|url: '\''http://localhost:3000'\''|g' app/capacitor.config.ts
 
 echo ""
-echo "✅ SUCCESS! Your standalone Release APK is ready."
-echo "📍 Location: app/android/app/build/outputs/apk/release/app-release.apk"
+echo "✅ SUCCESS! Your release artifacts are ready."
+echo "📍 APK: app/android/app/build/outputs/apk/release/app-release.apk"
+echo "📍 AAB: app/android/app/build/outputs/bundle/release/app-release.aab"
 echo ""
 echo "📲 To test on your phone now, run:"
 echo "adb install -r app/android/app/build/outputs/apk/release/app-release.apk"

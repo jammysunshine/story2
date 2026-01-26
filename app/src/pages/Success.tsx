@@ -138,7 +138,11 @@ export default function SuccessPage() {
 
         <nav className="flex items-center bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 shadow-inner">
           <button
-            onClick={() => navigateToTab('creator')}
+            onClick={() => {
+              localStorage.removeItem('book');
+              localStorage.setItem('step', '1');
+              navigateToTab('creator');
+            }}
             className="px-4 md:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 text-slate-400 hover:text-white"
           >
             <Sparkles size={14} /> Creator
@@ -231,17 +235,25 @@ export default function SuccessPage() {
             <div className="w-full max-w-md text-center space-y-8">
               <MagicGlow color="pink" />
               <div className="space-y-4">
-                <p className="text-xl font-black text-white uppercase tracking-wider">Crafting Your PDF</p>
-                <p className="text-sm text-slate-400">Assembling your beautifully illustrated book into a high-quality PDF...</p>
-                <p className="text-xs text-slate-600 font-bold uppercase tracking-widest italic">Est. time: 6-8 mins</p>
+                <p className="text-xl font-black text-white uppercase tracking-wider">Painting Your Masterpiece</p>
+                <p className="text-sm text-slate-400">Our AI artists are illustrating all 23 pages. This usually takes 5-7 minutes.</p>
+                <p className="text-sm font-bold text-primary px-6 py-3 bg-primary/10 rounded-2xl border border-primary/20">
+                  ✨ You don't need to wait here! We'll email you at {user?.email || 'your email'} when it's ready.
+                </p>
               </div>
             </div>
           ) : (
-            <a href={pdfUrl} target="_blank" className="w-full max-w-md animate-in zoom-in duration-1000">
-              <button className="w-full h-24 bg-green-600 text-white rounded-[2rem] font-black text-2xl uppercase tracking-widest shadow-2xl shadow-green-500/30 flex items-center justify-center gap-4 hover:scale-[1.02] transition-all active:scale-95 group hover:shadow-green-500/40">
-                <FileDown size={32} className="group-hover:translate-y-1 transition-transform" /> Download PDF
-              </button>
-            </a>
+            <div className="w-full max-w-md space-y-6 animate-in zoom-in duration-1000">
+              <div className="bg-green-500/10 border border-green-500/20 p-6 rounded-[2rem] text-center">
+                <p className="text-green-500 font-black uppercase tracking-widest text-xs mb-2">Success!</p>
+                <p className="text-white font-bold">Your high-resolution PDF is ready for download.</p>
+              </div>
+              <a href={pdfUrl} target="_blank" className="block">
+                <button className="w-full h-24 bg-green-600 text-white rounded-[2rem] font-black text-2xl uppercase tracking-widest shadow-2xl shadow-green-500/30 flex items-center justify-center gap-4 hover:scale-[1.02] transition-all active:scale-95 group hover:shadow-green-500/40">
+                  <FileDown size={32} className="group-hover:translate-y-1 transition-transform" /> Download PDF
+                </button>
+              </a>
+            </div>
           )}
 
           <div className="flex flex-col gap-4 w-full max-w-md">
@@ -252,11 +264,11 @@ export default function SuccessPage() {
                 localStorage.setItem('step', '1');
                 localStorage.setItem('activeTab', 'creator');
               }}
-              className="w-full h-16 bg-white text-slate-900 rounded-2xl font-black uppercase text-sm flex items-center justify-center gap-2 shadow-xl hover:bg-slate-100 active:scale-98 transition-all group hover:shadow-2xl hover:shadow-primary/20"
+              className="w-full h-20 bg-white text-slate-900 rounded-[1.5rem] font-black uppercase text-lg flex items-center justify-center gap-3 shadow-2xl hover:bg-slate-100 active:scale-95 transition-all group hover:shadow-primary/20"
             >
-              Create Another Adventure <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform text-primary" />
+              <Sparkles className="text-primary animate-pulse" /> Create Another Adventure <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform text-primary" />
             </Link>
-            <p className="text-center text-slate-600 font-bold text-[10px] uppercase tracking-[0.3em]">Thank you for your magic!</p>
+            <p className="text-center text-slate-600 font-bold text-[10px] uppercase tracking-[0.3em]">The magic continues in your library</p>
           </div>
         </div>
       </div>

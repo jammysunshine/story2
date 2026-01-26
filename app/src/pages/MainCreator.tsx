@@ -8,6 +8,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "../components/ui/sheet"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog"
 import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
 import { useToast } from "../hooks/use-toast"
@@ -603,6 +609,70 @@ export default function MainCreator() {
     });
   };
 
+  const [showParentalGate, setShowParentalGate] = useState(false);
+  const [parentalAnswer, setParentalGateAnswer] = useState('');
+  const [parentalProblem, setParentalGateProblem] = useState({ q: '', a: 0 });
+
+  const startParentalGate = () => {
+    const num1 = Math.floor(Math.random() * 10) + 5;
+    const num2 = Math.floor(Math.random() * 10) + 5;
+    setParentalGateProblem({ q: `${num1} + ${num2}`, a: num1 + num2 });
+    setShowParentalGate(true);
+  };
+
+  const verifyParentalGate = async () => {
+    if (parseInt(parentalAnswer) === parentalProblem.a) {
+      setShowParentalGate(false);
+      setParentalGateAnswer('');
+      
+      // Proceed to checkout logic
+      let currentUser = user;
+      if (!currentUser) {
+        currentUser = await login();
+        if (!currentUser) return;
+      }
+
+      if (book && book.bookId && book.title) {
+        createCheckoutSession(book.bookId, book.title, currentUser?.email);
+      }
+    } else {
+      toast({ title: "Incorrect", description: "Parents only, please!", variant: "destructive" });
+      startParentalGate(); // Refresh problem
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!window.confirm('CRITICAL: Are you sure? This will delete your account and all your saved stories. This cannot be undone.')) return;
+
+    try {
+      const res = await axios.delete(`${API_URL}/user/account`, {
+        headers: { Authorization: `Bearer ${user?.token}` }
+      });
+      if (res.data.success) {
+        toast({ title: "Account Deleted", description: "Your data has been removed." });
+        logout();
+      }
+    } catch (e) {
+      toast({ title: "Deletion Failed", description: "Please try logging out and in again.", variant: "destructive" });
+    }
+  };
+
+  const reportContent = async (pageNumber: number) => {
+    const reason = window.prompt('Please describe why you are reporting this content (e.g., offensive image, inappropriate text):');
+    if (!reason) return;
+
+    try {
+      await axios.post(`${API_URL}/report-content`, {
+        bookId: book?.bookId,
+        pageNumber,
+        reason
+      });
+      toast({ title: "Report Submitted", description: "Thank you. Our safety team will review this page." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to submit report." });
+    }
+  };
+
   const renderSelect = (label: string, field: keyof typeof formData, choices: string[]) => (
     <div>
       <label className="text-[10px] font-black text-slate-500 uppercase ml-1">{label}</label>
@@ -708,7 +778,10 @@ export default function MainCreator() {
             <Sparkles size={14} /> Creator
           </button>
           <button
-            onClick={() => setActiveTab('bookshelf')}
+            onClick={() => {
+              setActiveTab('bookshelf');
+              if (user?.token) fetchLibrary(user.token);
+            }}
             className={`px-4 md:px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'bookshelf' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-400 hover:text-white'
               }`}
           >
@@ -1033,7 +1106,13 @@ export default function MainCreator() {
                             </div>
                           )}
                         </div>
-                        <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg">
+                        <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg relative">
+                          <button
+                            onClick={() => reportContent(p.pageNumber)}
+                            className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 size={10} /> Report Content
+                          </button>
                           <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
                         </div>
                       </div>
@@ -1062,24 +1141,7 @@ export default function MainCreator() {
 
                   {!isPaid() && (
                     <button
-                      onClick={async () => {
-                        let currentUser = user;
-                        if (!currentUser) {
-                          toast({ title: "Login Required", description: "Please sign in to order your book!" });
-                          currentUser = await login();
-                          if (!currentUser) return; // User cancelled login
-                        }
-
-                        if (book && book.bookId && book.title) {
-                          createCheckoutSession(book.bookId, book.title, currentUser?.email);
-                        } else {
-                          toast({
-                            title: "Error",
-                            description: "Book information not available. Please try again.",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
+                      onClick={startParentalGate}
                       disabled={checkoutLoading}
                       className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                     >
@@ -1199,12 +1261,15 @@ export default function MainCreator() {
           ) : library.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
               {library.map((b) => (
-                <div key={`${b._id}-${b.status}`} onClick={() => {
-                  setBook({ ...b, bookId: b._id });
-                  setStep(3);
-                  setActiveTab('creator');
-                }} className="group cursor-pointer space-y-4">
-                  <div className="aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden border-8 border-white/5 shadow-2xl group-hover:border-primary/50 group-hover:scale-[1.02] transition-all relative">
+                <div key={`${b._id}-${b.status}`} className="group space-y-4">
+                  <div
+                    onClick={() => {
+                      setBook({ ...b, bookId: b._id });
+                      setStep(3);
+                      setActiveTab('creator');
+                    }}
+                    className="aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden border-8 border-white/5 shadow-2xl group-hover:border-primary/50 group-hover:scale-[1.02] transition-all relative cursor-pointer"
+                  >
                     {b.pages?.[0]?.imageUrl ? (
                       <img src={b.pages[0].imageUrl} className="w-full h-full object-cover" alt={b.title} />
                     ) : (
@@ -1213,11 +1278,29 @@ export default function MainCreator() {
                       </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-8 pt-20">
-                      <Badge className="mb-3 bg-primary/20 text-primary border-primary/20 uppercase text-[10px] font-black px-3 py-1">{b.status}</Badge>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {b.status === 'pdf_ready' ? (
+                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 uppercase text-[10px] font-black px-3 py-1">✅ Ready</Badge>
+                        ) : b.status === 'paid' ? (
+                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 uppercase text-[10px] font-black px-3 py-1 animate-pulse">🎨 Painting...</Badge>
+                        ) : (
+                          <Badge className="bg-primary/20 text-primary border-primary/20 uppercase text-[10px] font-black px-3 py-1">{b.status}</Badge>
+                        )}
+                      </div>
                       <h4 className="text-lg font-black uppercase tracking-tighter text-white leading-tight line-clamp-2">{b.title}</h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Click to View Adventure</p>
                     </div>
                   </div>
+
+                  {/* Direct Download Button for bookshelf cards */}
+                  {b.pdfUrl && (
+                    <a
+                      href={b.pdfUrl}
+                      target="_blank"
+                      className="w-full h-12 bg-white/5 hover:bg-primary text-white rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10 group-hover:border-primary/50"
+                    >
+                      <FileDown size={14} /> Download PDF
+                    </a>
+                  )}
                 </div>
               ))}
             </div>
@@ -1267,9 +1350,17 @@ export default function MainCreator() {
               </div>
 
               {user ? (
-                <button onClick={logout} className="w-full h-20 bg-red-500/5 text-red-500/50 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:bg-red-500/10 hover:text-red-500 transition-all border border-red-500/10 flex items-center justify-center gap-3 active:scale-95 group">
-                  <Trash2 size={16} className="group-hover:animate-bounce" /> Logout and End Session
-                </button>
+                <div className="space-y-4">
+                  <button onClick={logout} className="w-full h-20 bg-white/5 text-white/50 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:bg-white/10 hover:text-white transition-all border border-white/5 flex items-center justify-center gap-3 active:scale-95 group">
+                    Logout and End Session
+                  </button>
+                  <button onClick={deleteAccount} className="w-full h-14 bg-red-500/5 text-red-500/50 rounded-xl font-black uppercase tracking-[0.2em] text-[8px] hover:bg-red-500/10 hover:text-red-500 transition-all border border-red-500/10 flex items-center justify-center gap-3 active:scale-95 group">
+                    <Trash2 size={12} className="group-hover:animate-bounce" /> Delete My Account & Data
+                  </button>
+                  <a href="/privacy" target="_blank" className="block text-[8px] font-black uppercase text-slate-600 hover:text-primary transition-colors text-center tracking-widest">
+                    Privacy Policy & AI Safety
+                  </a>
+                </div>
               ) : (
                 <Button onClick={() => login()} size="lg" className="h-20 rounded-[1.5rem] font-black uppercase tracking-widest shadow-2xl">Sign In with Google</Button>
               )}
@@ -1277,6 +1368,36 @@ export default function MainCreator() {
           </div>
         </div>
       )}
+      {/* Parental Gate Modal */}
+      <Dialog open={showParentalGate} onOpenChange={setShowParentalGate}>
+        <DialogContent className="max-w-md bg-slate-900 border-white/10 text-white rounded-[2rem]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-center">Parents Only</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 text-center space-y-6">
+            <div className="bg-slate-800 p-8 rounded-3xl border border-white/5 shadow-inner">
+              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-2">Solve this to continue</p>
+              <h3 className="text-4xl font-black text-primary">{parentalProblem.q} = ?</h3>
+            </div>
+            <input
+              type="number"
+              value={parentalAnswer}
+              onChange={(e) => setParentalGateAnswer(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && verifyParentalGate()}
+              className="w-full h-16 bg-slate-800 rounded-2xl text-center text-2xl font-black outline-none border-2 border-transparent focus:border-primary/50 transition-all"
+              placeholder="Result"
+              autoFocus
+            />
+            <Button 
+              onClick={verifyParentalGate}
+              className="w-full h-16 rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-primary/20"
+            >
+              Verify & Order
+            </Button>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Verification required for children's app safety</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

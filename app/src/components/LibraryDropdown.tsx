@@ -89,6 +89,22 @@ export function LibraryDropdown({ user }: { user: any }) {
     }
   };
 
+  const reportContent = async (pageNumber: number) => {
+    const reason = window.prompt('Please describe why you are reporting this content (e.g., offensive image, inappropriate text):');
+    if (!reason) return;
+
+    try {
+      await axios.post(`${API_URL}/report-content`, {
+        bookId: selectedBook?.id,
+        pageNumber,
+        reason
+      });
+      toast({ title: "Report Submitted", description: "Thank you. Our safety team will review this page." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to submit report." });
+    }
+  };
+
   return (
     <>
       <div className="relative">
@@ -189,7 +205,13 @@ export function LibraryDropdown({ user }: { user: any }) {
                     <span className="px-4 py-2 bg-black/50 backdrop-blur-md rounded-full text-[10px] text-white font-black uppercase tracking-widest border border-white/10">Page {page.pageNumber}</span>
                   </div>
                 </div>
-                <div className="max-w-2xl mx-auto bg-white/5 p-8 rounded-2xl border border-white/5 text-center">
+                <div className="max-w-2xl mx-auto bg-white/5 p-8 rounded-2xl border border-white/5 text-center relative">
+                  <button
+                    onClick={() => reportContent(page.pageNumber)}
+                    className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1"
+                  >
+                    <Trash2 size={10} /> Report
+                  </button>
                   <p className="text-xl text-slate-200 leading-relaxed font-medium italic">"{page.text}"</p>
                 </div>
               </div>

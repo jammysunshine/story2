@@ -26,9 +26,12 @@ echo "📱 Building Android APK ($BUILD_TYPE)..."
 cd android
 
 if [ "$BUILD_TYPE" = "release" ]; then
-    echo "Building release APK..."
-    ./gradlew assembleRelease
+    echo "Building release artifacts (APK and AAB)..."
+    ./gradlew assembleRelease bundleRelease
     APK_PATH="app/build/outputs/apk/release/app-release.apk"
+    AAB_PATH="app/build/outputs/bundle/release/app-release.aab"
+    echo "✅ Release APK ready: $APK_PATH"
+    echo "✅ Release AAB ready: $AAB_PATH"
 else
     echo "Building debug APK..."
     ./gradlew assembleDebug
