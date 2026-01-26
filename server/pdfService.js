@@ -180,13 +180,13 @@ async function generatePdf(db, bookId) {
 
     const mergedPdf = await PDFDocument.create();
     
-    // CONSISTENCY FIX: Force 127.0.0.1 for internal Puppeteer rendering 
-    // This avoids external network/DNS issues and ensures it hits the locally served frontend.
-    // We use 3001 as fallback to match the default in server/index.js
-    const internalPort = process.env.PORT || 3001;
-    const baseUrl = `http://127.0.0.1:${internalPort}`;
+    // CONSISTENCY FIX: Use External Path (APP_URL) in GCloud to avoid loopback hangs.
+    // We detect GCloud using the built-in K_SERVICE variable.
+    const baseUrl = process.env.K_SERVICE 
+      ? process.env.APP_URL 
+      : `http://127.0.0.1:${process.env.PORT || 3001}`;
     
-    logger.info(`🎯 [PDF_DEBUG] Using internal base URL for PDF generation: ${baseUrl}`);
+    logger.info(`🎯 [PDF_DEBUG] Using base URL for PDF generation: ${baseUrl} (Detected env: ${process.env.K_SERVICE ? 'GCloud' : 'Local'})`);
 
     const storyPageCount = book.pages.length;
     const totalActualPages = storyPageCount + 1; // +1 for the Title Page rendered first in PrintTemplate.tsx
