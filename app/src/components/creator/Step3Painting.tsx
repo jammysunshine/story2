@@ -46,6 +46,7 @@ export function Step3Painting({
       {/* Check if we're in the painting phase (not all teaser images are done yet) */}
       {(book.status === 'generating' || book.status === 'teaser_generating' || book.status === 'preview' ||
         (book.status !== 'teaser_ready' && progress < 100)) ? (
+        // Show centralized loading animation when teaser images are being generated
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="pink" />
           <div className="space-y-4">
@@ -61,6 +62,7 @@ export function Step3Painting({
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Estimated Time: 2-3 Minutes</p>
         </div>
       ) : book.status === 'teaser_ready' && progress < 100 ? (
+        // Special case: if status is teaser_ready but progress is still < 100%, show loading
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="pink" />
           <div className="space-y-4">
@@ -76,6 +78,7 @@ export function Step3Painting({
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Almost Ready!</p>
         </div>
       ) : book.status === 'paid' && fullProgress < 100 ? (
+        // Show centralized loading animation when full book images are being generated after payment
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="blue" />
           <div className="space-y-4">
@@ -91,6 +94,7 @@ export function Step3Painting({
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Estimated Time: 5-8 Minutes</p>
         </div>
       ) : book.status === 'paid' && !book.pdfUrl ? (
+        // Show loading animation when PDF is being generated
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="amber" />
           <div className="space-y-4">
@@ -103,9 +107,11 @@ export function Step3Painting({
               style={{ width: '75%' }}
             />
           </div>
-          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">EST. TIME: 6-8 MINS</p>
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">EST. TIME: 6-8 MINS
+          </p>
         </div>
       ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
+        // Show loading animation when PDF is being prepared for download
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="green" />
           <div className="space-y-4">
@@ -121,6 +127,7 @@ export function Step3Painting({
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Almost Ready!</p>
         </div>
       ) : book.status === 'printing' ? (
+        // Show loading animation when book is being printed
         <div className="py-20 text-center space-y-10">
           <MagicGlow color="purple" />
           <div className="space-y-4">
@@ -136,6 +143,7 @@ export function Step3Painting({
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">On Its Way To You!</p>
         </div>
       ) : (
+        // Show the book preview with individual page placeholders
         <>
           <div className="text-center">
             <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
@@ -153,6 +161,13 @@ export function Step3Painting({
                         src={p.imageUrl}
                         className="w-full h-full object-cover"
                         alt={`Page ${i + 1}`}
+                        onError={() => {
+                          console.error(`Failed to load image: ${p.imageUrl}`);
+                          // If image fails to load, it might be an expired signed URL
+                          // We can't easily trigger a single page refresh here without complex state,
+                          // but the poller will eventually get a new one.
+                          // For now, let's just log it.
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
