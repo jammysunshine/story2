@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser, FileDown, Flag, Play, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser, FileDown, Flag } from 'lucide-react'
 import axios from 'axios'
 import {
   Sheet,
@@ -18,6 +18,18 @@ import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
 import { useToast } from "../hooks/use-toast"
 import { useCheckout } from "../hooks/useCheckout";
+import { MagicGallery } from "../components/MagicGallery";
+import { MagicGlow } from "../components/MagicGlow";
+import { Separator } from "../components/UIComponents";
+import { ParentalGateDialog } from "../components/dialogs/ParentalGateDialog";
+import { ReportDialog } from "../components/dialogs/ReportDialog";
+import { DeleteAccountDialog } from "../components/dialogs/DeleteAccountDialog";
+import { OrderTracker } from "../components/bookshelf/OrderTracker";
+import { LibraryGrid } from "../components/bookshelf/LibraryGrid";
+import { AccountSection } from "../components/AccountSection";
+import { Step1Hero } from "../components/creator/Step1Hero";
+import { Step2Preview } from "../components/creator/Step2Preview";
+import { Step3Painting } from "../components/creator/Step3Painting";
 
 import { Capacitor } from '@capacitor/core'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
@@ -652,15 +664,15 @@ export default function MainCreator() {
   };
 
   const [showReportDialog, setShowReportDialog] = useState(false);
-  const [reportData, setReportData] = useState({ pageNumber: 1, reason: '' });
+  const [reportData, setReportData] = useState({ pageNumber: 1, reason: '', bookId: '' });
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-
-  const reportContent = (pageNumber: number) => {
-    setReportData({ pageNumber, reason: '' });
+  const reportContent = (pageNumber: number, specificBookId?: string) => {
+    setReportData({ 
+      pageNumber, 
+      reason: '', 
+      bookId: specificBookId || book?.bookId || '' 
+    });
     setShowReportDialog(true);
   };
 
@@ -670,10 +682,15 @@ export default function MainCreator() {
       return;
     }
 
+    if (!reportData.bookId) {
+      toast({ title: "Error", description: "Could not identify which book to report.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmittingReport(true);
     try {
       await axios.post(`${API_URL}/report-content`, {
-        bookId: book?.bookId,
+        bookId: reportData.bookId,
         reporterEmail: user?.email || 'anonymous',
         pageNumber: reportData.pageNumber,
         reason: reportData.reason
@@ -725,50 +742,7 @@ export default function MainCreator() {
     </div>
   )
 
-  const MagicGlow = ({ color = 'pink' }: { color?: 'pink' | 'blue' | 'amber' | 'purple' | 'green' }) => {
-    const colorMap: Record<string, string> = {
-      pink: 'from-pink-600/50 to-rose-600/50 border-pink-600/70',
-      blue: 'from-blue-600/50 to-indigo-600/50 border-blue-600/70',
-      amber: 'from-amber-600/50 to-orange-600/50 border-amber-600/70',
-      purple: 'from-purple-600/50 to-indigo-600/50 border-purple-600/70',
-      green: 'from-green-600/50 to-emerald-600/50 border-green-600/70'
-    };
 
-    return (
-      <div className="relative w-48 h-48 mx-auto group">
-        <style dangerouslySetInnerHTML={{
-          __html: `
-          @keyframes magic-float {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50% { transform: translateY(-10px) rotate(2deg); }
-          }
-          @keyframes magic-glow-1 {
-            0%, 100% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.3); opacity: 0.8; }
-          }
-          @keyframes magic-glow-2 {
-            0%, 100% { transform: scale(1.1); opacity: 0.3; }
-            50% { transform: scale(1.6); opacity: 0.6; }
-          }
-          @keyframes magic-pulse {
-            0%, 100% { transform: scale(1); opacity: 0.7; }
-            50% { transform: scale(1.1); opacity: 1; }
-          }
-          .animate-magic-float { animation: magic-float 3s ease-in-out infinite; }
-          .animate-magic-glow-1 { animation: magic-glow-1 3s ease-in-out infinite; }
-          .animate-magic-glow-2 { animation: magic-glow-2 4s ease-in-out infinite; }
-          .animate-magic-pulse { animation: magic-pulse 2s ease-in-out infinite; }
-        `}} />
-        <div className={`absolute inset-0 bg-gradient-to-tr ${colorMap[color]} rounded-full blur-3xl animate-magic-glow-2`} />
-        <div className={`absolute inset-0 bg-gradient-to-tr ${colorMap[color]} rounded-full blur-xl animate-magic-glow-1`} />
-        <div className={`relative bg-slate-900/90 backdrop-blur-md border-4 ${colorMap[color].split(' ').pop()} w-full h-full rounded-full flex items-center justify-center shadow-[0_0_80px_rgba(0,0,0,0.7)] animate-magic-pulse`}>
-          {(color === 'pink' || color === 'blue') ? <Palette className="text-white w-20 h-20 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]" /> :
-            (color === 'amber' || color === 'green') ? <FileText className="text-white w-20 h-20 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]" /> :
-              <Package className="text-white w-20 h-20 drop-shadow-[0_0_20px_rgba(255,255,255,0.8)]" />}
-        </div>
-      </div>
-    );
-  };
 
   const tapCountRef = useRef(0);
   const tapTimeoutRef = useRef<number | null>(null);
@@ -942,524 +916,80 @@ export default function MainCreator() {
         </div>
       </header>
 
-            {activeTab === 'creator' && (
+                  {activeTab === 'creator' && (
 
-              <div className="space-y-8">
+                    <div className="space-y-8">
 
-      
+            
 
-                {step === 1 && (
+                      {step === 1 && (
 
-                  <div className="max-w-md mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <Step1Hero 
 
-                    {loading ? (
+                          loading={loading}
 
-                      // Magical Loading State for Story Generation
+                          formData={formData}
 
-                      <div className="py-20 text-center space-y-10 animate-in zoom-in duration-500">
+                          setFormData={setFormData}
 
-                        <MagicGlow color="pink" />
+                          onRandomize={randomizeFormData}
 
-                        <div className="space-y-4">
+                          onPhotoUpload={handlePhotoUpload}
 
-                          <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Weaving Your Story</h2>
+                          isUploading={isUploading}
 
-                          <p className="text-slate-400 text-lg font-medium italic">"Once upon a time..."</p>
+                          photoUrl={photoUrl}
 
-                        </div>
+                          setPhotoUrl={setPhotoUrl}
 
-                        <div className="max-w-xs mx-auto w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                          onGenerate={generateStory}
 
-                          <div className="h-full bg-gradient-to-r from-pink-500 to-primary animate-pulse w-full" />
+                          fileInputRef={fileInputRef}
 
-                        </div>
+                          options={options}
 
-                        <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] animate-pulse">
+                          randomAnimals={randomAnimals}
 
-                          Crafting personalized magic
+                          randomLessons={randomLessons}
 
-                        </p>
+                        />
 
-                      </div>
+                      )}
 
-                    ) : (
+            
 
-                      <>
+                      {step === 2 && book && (
 
-                        <div className="flex flex-col items-center gap-4 text-center">
+                        <Step2Preview 
 
-                          <h2 className="text-4xl font-black uppercase tracking-tighter text-white">The Hero</h2>
+                          book={book}
 
-                          <Button
+                          onStartPainting={startPainting}
 
-                            variant="outline"
+                          loading={loading}
 
-                            onClick={randomizeFormData}
+                          onEdit={() => setStep(1)}
 
-                            className="rounded-full border-primary/30 text-primary hover:bg-primary/10 h-10 px-6 text-xs font-black uppercase tracking-widest hover:shadow-lg hover:shadow-primary/20 transition-all"
+                          onReportContent={reportContent}
 
-                          >
+                        />
 
-                            <Sparkles className="w-4 h-4 mr-2" />
-
-                            Surprise Me
-
-                          </Button>
-
-                        </div>
-
-      
-
-                        <div className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 shadow-2xl space-y-6">
-
-                          {/* Magic Photo Scan */}
-
-                          <div
-
-                            onClick={() => fileInputRef.current?.click()}
-
-                            className={`bg-slate-950/50 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center p-8 text-center group transition-all cursor-pointer relative overflow-hidden ${photoUrl ? 'border-green-500/50' : 'border-white/10 hover:border-primary/30'
-
-                              } hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.02] transition-transform`}
-
-                          >
-
-                            <input
-
-                              type="file"
-
-                              ref={fileInputRef}
-
-                              onChange={handlePhotoUpload}
-
-                              className="hidden"
-
-                              accept="image/*"
-
-                            />
-
-      
-
-                            {isUploading ? (
-
-                              <div className="flex flex-col items-center">
-
-                                <Loader2 className="animate-spin text-primary mb-4" size={32} />
-
-                                <p className="text-[10px] font-black text-white uppercase tracking-widest">Scanning Magic Features...</p>
-
-                              </div>
-
-                            ) : photoUrl ? (
-
-                              <div className="flex flex-col items-center">
-
-                                <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-green-500 mb-4 shadow-lg shadow-green-500/20">
-
-                                  <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
-
-                                </div>
-
-                                <h4 className="text-sm font-black text-green-400 uppercase tracking-widest mb-1">Magic Link Established</h4>
-
-                                <p className="text-[10px] text-slate-500 font-bold uppercase">Character will sync with this photo</p>
-
-                                <button
-
-                                  onClick={(e) => { e.stopPropagation(); setPhotoUrl(''); }}
-
-                                  className="mt-4 text-[8px] font-black uppercase text-red-400 hover:text-red-500 transition-colors flex items-center gap-1"
-
-                                >
-
-                                  <Trash2 size={10} /> REMOVE PHOTO
-
-                                </button>
-
-                              </div>
-
-                            ) : (
-
-                              <>
-
-                                <div className="w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-white/5">
-
-                                  <Camera className="text-slate-400 group-hover:text-primary transition-colors" size={32} />
-
-                                </div>
-
-                                <h4 className="text-lg font-black text-white uppercase tracking-widest mb-2">Magic Photo Scan</h4>
-
-                                <p className="text-[10px] text-slate-400 font-bold uppercase leading-relaxed max-w-[200px]">Upload a photo to sync your child's features with the AI character.</p>
-
-                                <Badge variant="outline" className="mt-4 border-amber-500/30 text-amber-500 text-[8px] font-black uppercase bg-amber-500/5">Enable Character Sync</Badge>
-
-                              </>
-
-                            )}
-
-                          </div>
-
-      
-
-                          <div className="grid grid-cols-2 gap-4">
-
-                            <div className="col-span-2">
-
-                              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Hero's Name</label>
-
-                              <input value={formData.childName} onChange={e => setFormData({ ...formData, childName: e.target.value })} className="w-full bg-slate-800 rounded-xl h-14 px-6 outline-none font-black text-lg focus:ring-2 focus:ring-primary transition-all border border-transparent focus:border-primary/30 shadow-sm focus:shadow-lg focus:shadow-primary/10" placeholder="e.g. Henry" />
-
-                            </div>
-
-      
-
-                            {renderSelect('Age', 'age', Array.from({ length: 23 }, (_, i) => (i + 3).toString()))}
-
-                            {renderSelect('Gender', 'gender', options.genders)}
-
-                            {renderSelect('Skin Tone', 'skinTone', options.skinTones)}
-
-                            {renderSelect('Hair Style', 'hairStyle', options.hairStyles)}
-
-                            {renderSelect('Hair Color', 'hairColor', options.hairColors)}
-
-                            {renderSelect('Animal Friend', 'animal', randomAnimals)}
-
-                          </div>
-
-      
-
-                          <Separator />
-
-      
-
-                          <div className="grid grid-cols-1 gap-4">
-
-                            {renderSelect('Art Style', 'characterStyle', options.styles)}
-
-                            {renderSelect('Story Location', 'location', options.locations)}
-
-                            {renderSelect('Life Lesson', 'lesson', randomLessons)}
-
-                          </div>
-
-                        </div>
-
-      
-
-                                          <button onClick={generateStory} disabled={loading} className="w-full h-20 bg-primary text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-primary/30 hover:scale-[1.02]">
-                                            <Wand2 />
-                                            Write My Story
-                                          </button>
-                        
-                                                            {/* Magic Gallery Section */}
-                                                            <MagicGallery />
-                                          
-                                                            <div className="pb-12 flex justify-center">
-                                                              <button
-                                                                onClick={() => {
-                                                                  const sampleBookId = "697736eadd2afbb4f929b2ff";
-                                                                  window.location.href = `/success?bookId=${sampleBookId}`;
-                                                                }}
-                                                                className="group flex flex-col items-center gap-3 transition-all active:scale-95"
-                                                              >
-                                                                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all shadow-lg group-hover:shadow-primary/30">
-                                                                  <BookOpen size={24} />
-                                                                </div>
-                                                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 group-hover:text-primary transition-colors">View a Sample Adventure</span>
-                                                              </button>
-                                                            </div>
-                                                          </>
-                                                        )}                                    </div>
-                                  )}
-          {step === 2 && book && (
-            <div className="max-w-2xl mx-auto space-y-8 animate-in zoom-in duration-500">
-              <div className="text-center">
-                <h2 className="text-3xl font-black uppercase text-white">{book.title}</h2>
-                <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest mt-2">Draft Preview</p>
-              </div>
-              <div className="bg-slate-900/50 p-8 rounded-[2.5rem] border border-white/5 max-h-[50vh] overflow-y-auto space-y-8 shadow-inner custom-scrollbar relative">
-                {book.pages?.map((p: BookPage) => (
-                  <div key={p.pageNumber} className="relative pl-8">
-                    <span className="absolute left-0 top-0 text-[10px] font-black text-primary opacity-50">{p.pageNumber}</span>
-                    <p className="text-xl text-slate-200 italic leading-relaxed">"{p.text}"</p>
-                  </div>
-                ))}
-                
-                <div className="pt-12 pb-4 flex justify-center">
-                  <button
-                    onClick={() => reportContent(1)}
-                    className="text-slate-600 hover:text-red-400 text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 opacity-20 hover:opacity-100"
-                  >
-                    <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Story Content
-                  </button>
-                </div>
-              </div>
-              <button onClick={startPainting} disabled={loading} className="w-full h-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-[1.5rem] font-black text-xl shadow-2xl shadow-blue-500/20 flex items-center justify-center gap-3 active:scale-95 transition-all disabled:opacity-50 hover:shadow-blue-500/30 hover:scale-[1.02]">
-                {loading ? <Loader2 className="animate-spin" /> : <Sparkles />}
-                Approve & Illustrate
-              </button>
-
-              <button onClick={() => setStep(1)} className="w-full py-4 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-slate-400 transition-colors">Edit Hero Details</button>
-            </div>
-          )}
+                      )}
 
           {step === 3 && book && (
-            <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
-              {/* Check if we're in the painting phase (not all teaser images are done yet) */}
-              {(book.status === 'generating' || book.status === 'teaser_generating' || book.status === 'preview' ||
-                (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (
-                // Show centralized loading animation when teaser images are being generated
-                <div className="py-20 text-center space-y-10">
-                  {(() => { console.log("DEBUG: Rendering teaser generation animation. Status:", book.status, "Progress:", calculateProgress()); return null; })()}
-                  <MagicGlow color="pink" />
-                  <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Creating Teaser Illustrations</h2>
-                    <p className="text-slate-400 text-lg font-medium">Generating {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} stunning AI illustrations...</p>
-                  </div>
-                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
-                      style={{
-                        width: `${calculateProgress()}%`
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    Estimated Time: 2-3 Minutes
-                  </p>
-                </div>
-              ) : book.status === 'teaser_ready' && calculateProgress() < 100 ? (
-                // Special case: if status is teaser_ready but progress is still < 100%, show loading
-                <div className="py-20 text-center space-y-10">
-                  <MagicGlow color="pink" />
-                  <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finishing Teaser Illustrations</h2>
-                    <p className="text-slate-400 text-lg font-medium">Finalizing {Math.min(TEASER_LIMIT, book.pages?.length || TEASER_LIMIT)} teaser illustrations...</p>
-                  </div>
-                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-pink-500 to-amber-500 transition-all duration-1000 ease-out"
-                      style={{
-                        width: `${calculateProgress()}%`
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    Almost Ready!
-                  </p>
-                </div>
-              ) : book.status === 'paid' && calculateFullBookProgress() < 100 ? (
-                // Show centralized loading animation when full book images are being generated after payment
-                <div className="py-20 text-center space-y-10">
-                  {(() => { console.log("DEBUG: Rendering full book generation animation. Status:", book.status, "Full progress:", calculateFullBookProgress()); return null; })()}
-                  <MagicGlow color="blue" />
-                  <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Completing Your Full Book</h2>
-                    <p className="text-slate-400 text-lg font-medium">Generating all {book.pages?.length || 23} illustrations for your full book...</p>
-                  </div>
-                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-1000 ease-out"
-                      style={{
-                        width: `${calculateFullBookProgress()}%`
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    Estimated Time: 5-8 Minutes
-                  </p>
-                </div>
-              ) : book.status === 'paid' && !book.pdfUrl ? (
-                // Show loading animation when PDF is being generated
-                <div className="py-20 text-center space-y-10">
-                  {(() => { console.log("DEBUG: Rendering PDF generation animation. Status:", book.status, "PDF URL exists:", !!book.pdfUrl); return null; })()}
-                  <MagicGlow color="amber" />
-                  <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Preparing Your High-Resolution PDF</h2>
-                    <p className="text-slate-400 text-lg font-medium">Assembling your beautifully illustrated book into a high-quality PDF...</p>
-                  </div>
-                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-1000 ease-out"
-                      style={{
-                        width: '75%' // PDF generation is typically quick once images are ready
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    EST. TIME: 6-8 MINS
-                  </p>
-                </div>
-              ) : book.status === 'pdf_ready' && !book.pdfUrl ? (
-                // Show loading animation when PDF is being prepared for download
-                <div className="py-20 text-center space-y-10">
-                  <MagicGlow color="green" />
-                  <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Finalizing Your PDF</h2>
-                    <p className="text-slate-400 text-lg font-medium">Your PDF is ready! Preparing download link...</p>
-                  </div>
-                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-1000 ease-out"
-                      style={{
-                        width: '100%'
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    Almost Ready!
-                  </p>
-                </div>
-              ) : book.status === 'printing' ? (
-                // Show loading animation when book is being printed
-                <div className="py-20 text-center space-y-10">
-                  <MagicGlow color="purple" />
-                  <div className="space-y-4">
-                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter">Printing Your Book</h2>
-                    <p className="text-slate-400 text-lg font-medium">Your hardcover book is being professionally printed and will ship soon!</p>
-                  </div>
-                  <div className="max-w-md mx-auto w-full bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-1000 ease-out"
-                      style={{
-                        width: '100%'
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">
-                    On Its Way To You!
-                  </p>
-                </div>
-              ) : (
-                // Show the book preview with individual page placeholders
-                <>
-                  <div className="text-center">
-                    <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>
-                    <p className="text-slate-400 mt-4">We're painting the first {TEASER_LIMIT} pages for free!</p>
-                  </div>
-
-                  <div className="space-y-20">
-                    {book.pages?.map((p: BookPage, i: number) => (
-                      <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
-                        <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
-                          {(i < TEASER_LIMIT || isPaid()) ? (
-                            p.imageUrl && !p.imageUrl.includes('placeholder') ? (
-                              <img
-                                key={p.imageUrl}
-                                src={p.imageUrl}
-                                className="w-full h-full object-cover"
-                                alt={`Page ${i + 1}`}
-                                onError={() => {
-                                  console.error(`Failed to load image: ${p.imageUrl}`);
-                                  // If image fails to load, it might be an expired signed URL
-                                  // We can't easily trigger a single page refresh here without complex state,
-                                  // but the poller will eventually get a new one.
-                                  // For now, let's just log it.
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
-                                <Palette className="text-slate-700 w-12 h-12" />
-                                <p className="text-[10px] font-black uppercase text-slate-700 tracking-widest text-center px-8">AI is painting this page...</p>
-                              </div>
-                            )
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 text-slate-700">
-                              <Lock size={48} />
-                              <p className="text-[10px] font-black uppercase tracking-widest">Order to Unlock Illustration</p>
-                            </div>
-                          )}
-                        </div>
-                        <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg relative">
-                          <button
-                            onClick={() => reportContent(p.pageNumber)}
-                            className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1 opacity-20 hover:opacity-100"
-                          >
-                            <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Content
-                          </button>
-                          <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <div className="bg-slate-900/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-2xl sticky bottom-6">
-                <h3 className="text-xl font-black uppercase mb-2">Love the story?</h3>
-                <p className="text-slate-400 text-sm mb-6 font-medium">Order the full book to unlock all 23 illustrations and get a physical hardcover copy.</p>
-
-                <div className="flex flex-col gap-4">
-                  {book.pdfUrl && (
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => window.open(book.pdfUrl, '_blank')}
-                        className="w-full h-14 bg-slate-800 text-white rounded-xl font-bold text-lg border border-white/10 hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                      >
-                        <ExternalLink size={20} />
-                        View Digital PDF
-                      </button>
-                      <p className="text-center text-[8px] text-slate-500 font-bold uppercase tracking-widest">Digital copy included with every physical book</p>
-                    </div>
-                  )}
-
-                  {!isPaid() && (
-                    <button
-                      onClick={startParentalGate}
-                      disabled={checkoutLoading}
-                      className="w-full h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 text-white rounded-2xl font-black text-xl shadow-xl hover:shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-                    >
-                      {checkoutLoading ? (
-                        <>
-                          <Loader2 className="animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          Order Hardcover (${BOOK_COST} {BASE_CURRENCY})
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="bg-slate-950/50 p-10 rounded-[2.5rem] border border-white/5 space-y-6">
-                <div className="flex items-center gap-3">
-                  <FileDown className="text-primary w-6 h-6" />
-                  <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Your Downloads</h3>
-                </div>
-                {library.filter(b => b.pdfUrl).length === 0 ? (
-                  <p className="text-sm text-slate-500">No PDFs available yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {library.filter(b => b.pdfUrl).map(book => (
-                      <a
-                        key={book._id}
-                        href={book.pdfUrl}
-                        download={`${book.title}.pdf`}
-                        className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-white/5 hover:border-primary/30 transition-all group"
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileText className="text-primary w-5 h-5" />
-                          <div>
-                            <p className="font-bold text-sm text-white group-hover:text-primary transition-colors">{book.title}</p>
-                            <p className={`text-[10px] uppercase tracking-wider ${
-                              (book.status === 'pdf_ready' || book.status === 'printing') ? 'text-green-500' : 'text-slate-500'
-                            }`}>
-                              {book.status === 'printing' ? 'Book print in progress' : 'Ready'}
-                            </p>
-                          </div>
-                        </div>
-                        <FileDown className="w-4 h-4 text-slate-600 group-hover:text-primary transition-colors" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <Step3Painting 
+              book={book}
+              teaserLimit={TEASER_LIMIT}
+              isPaid={isPaid()}
+              progress={calculateProgress()}
+              fullProgress={calculateFullBookProgress()}
+              onReportContent={reportContent}
+              onStartParentalGate={startParentalGate}
+              checkoutLoading={checkoutLoading}
+              bookCost={BOOK_COST}
+              baseCurrency={BASE_CURRENCY}
+              library={library}
+            />
           )}
         </div>
       )}
@@ -1471,72 +1001,10 @@ export default function MainCreator() {
           </div>
 
           {/* Active Deliveries Tracker */}
-          {(() => {
-            // Combine real orders with "in-progress" books from library
-            const activeLibraryBooks = library.filter(b => ['paid', 'illustrated', 'printing'].includes(b.status));
-            const hasActiveDeliveries = orders.length > 0 || activeLibraryBooks.length > 0;
-
-            if (!hasActiveDeliveries) return null;
-
-            return (
-              <div className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <Package className="text-primary w-5 h-5" />
-                  <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-500">Active Deliveries</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Show books currently being painted/processed first */}
-                  {activeLibraryBooks.map((b) => (
-                    <div key={`proc-${b._id}`} className="bg-slate-900/50 p-6 rounded-[2rem] border border-blue-500/30 flex items-center gap-6 shadow-xl relative overflow-hidden group">
-                      <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center shrink-0">
-                        <Palette className="text-blue-400 w-8 h-8 animate-pulse" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black uppercase text-blue-500 tracking-wider mb-1">Processing Magic</p>
-                        <h4 className="text-sm font-bold text-white truncate">{b.title}</h4>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase bg-blue-500/20 text-blue-400 animate-pulse">
-                            {b.status === 'printing' ? 'Preparing Print' : 'Painting Images...'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Show official orders */}
-                  {orders.map((order) => (
-                    <div key={order._id} className="bg-slate-900/50 p-6 rounded-[2rem] border border-white/5 flex items-center gap-6 shadow-xl relative overflow-hidden group hover:border-primary/30 transition-all">
-                      <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
-                        <Package className="text-primary w-8 h-8" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Hardcover Storybook</p>
-                        <h4 className="text-sm font-bold text-white truncate">Ordered {new Date(order.createdAt).toLocaleDateString()}</h4>
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase ${
-                            order.status === 'Shipped' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
-                          }`}>
-                            {order.status}
-                          </span>
-                          <p className="text-[10px] font-black text-primary">${order.amount.toFixed(2)}</p>
-                        </div>
-                      </div>
-                      {order.trackingUrl && (
-                        <a 
-                          href={order.trackingUrl} 
-                          target="_blank" 
-                          className="absolute top-4 right-4 text-blue-400 hover:text-blue-300 transition-colors"
-                          title="Track Shipment"
-                        >
-                          <ExternalLink size={14} />
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          <OrderTracker 
+            orders={orders}
+            activeLibraryBooks={library.filter(b => ['paid', 'illustrated', 'printing'].includes(b.status))}
+          />
 
           {!user ? (
             <div className="bg-slate-900/50 p-20 rounded-[3rem] border border-dashed border-white/10 text-center space-y-8">
@@ -1550,66 +1018,15 @@ export default function MainCreator() {
               <Button onClick={() => login()} size="lg" className="h-20 px-10 rounded-[1.5rem] font-black uppercase tracking-widest text-lg shadow-2xl shadow-primary/30 active:scale-95 transition-all">Sign In with Google</Button>
             </div>
           ) : library.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
-              {library.map((b) => (
-                <div key={`${b._id}-${b.status}`} className="group space-y-4">
-                  <div
-                    onClick={() => {
-                      setBook({ ...b, bookId: b._id });
-                      setStep(3);
-                      setActiveTab('creator');
-                    }}
-                    className="aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden border-8 border-white/5 shadow-2xl group-hover:border-primary/50 group-hover:scale-[1.02] transition-all relative cursor-pointer"
-                  >
-                    {b.pages?.[0]?.imageUrl ? (
-                      <img src={b.pages[0].imageUrl} className="w-full h-full object-cover" alt={b.title} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-800">
-                        <Palette className="text-slate-700 w-16 h-16 animate-pulse" />
-                      </div>
-                    )}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-8 pt-20">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {b.status === 'pdf_ready' ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 uppercase text-[10px] font-black px-3 py-1">✅ Ready</Badge>
-                        ) : b.status === 'printing' ? (
-                          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 uppercase text-[10px] font-black px-3 py-1">🖨️ Book print in progress</Badge>
-                        ) : b.status === 'paid' ? (
-                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 uppercase text-[10px] font-black px-3 py-1 animate-pulse">🎨 Painting...</Badge>
-                        ) : (
-                          <Badge className="bg-primary/20 text-primary border-primary/20 uppercase text-[10px] font-black px-3 py-1">{b.status}</Badge>
-                        )}
-                      </div>
-                      <h4 className="text-lg font-black uppercase tracking-tighter text-white leading-tight line-clamp-2">{b.title}</h4>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {/* Direct Download Button for bookshelf cards */}
-                    {b.pdfUrl && (
-                      <a
-                        href={b.pdfUrl}
-                        target="_blank"
-                        className="flex-1 h-12 bg-white/5 hover:bg-primary text-white rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10 group-hover:border-primary/50"
-                      >
-                        <FileDown size={14} /> Download PDF
-                      </a>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // For bookshelf, we report the book generally (page 1 context)
-                        reportContent(1); 
-                      }}
-                      className="w-12 h-12 bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-xl transition-all flex items-center justify-center border border-white/10 opacity-20 hover:opacity-100"
-                      title="Report Inappropriate Content"
-                    >
-                      <Flag size={10} className="text-red-500 fill-current" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <LibraryGrid 
+              library={library}
+              onSelectBook={(b) => {
+                setBook({ ...b, bookId: b._id });
+                setStep(3);
+                setActiveTab('creator');
+              }}
+              onReportContent={reportContent}
+            />
           ) : (
             <div className="bg-slate-900/50 p-20 rounded-[3rem] border border-dashed border-white/10 text-center space-y-8">
               <div className="w-24 h-24 bg-slate-800 rounded-3xl flex items-center justify-center mx-auto shadow-2xl -rotate-3">
@@ -1626,304 +1043,46 @@ export default function MainCreator() {
       )}
 
       {activeTab === 'account' && (
-        <div className="max-w-2xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <div className="bg-slate-900/50 p-12 rounded-[3.5rem] border border-white/5 flex flex-col items-center gap-8 text-center shadow-2xl transition-all hover:border-primary/20">
-            <div className="w-32 h-32 bg-gradient-to-br from-primary via-purple-600 to-pink-600 rounded-[2.5rem] flex items-center justify-center text-5xl font-black shadow-2xl border-4 border-white/10 rotate-3">
-              {user?.name?.[0] || '?'}
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-5xl font-black uppercase tracking-tighter text-white">{user?.name || 'Guest'}</h2>
-              <p className="text-slate-500 font-bold uppercase tracking-[0.2em] text-xs underline underline-offset-8 decoration-primary/30">{user?.email || 'Login to sync collections'}</p>
-            </div>
-
-            <div className="grid grid-cols-1 w-full gap-6 mt-6">
-              <div className="bg-slate-950/50 p-10 rounded-[2.5rem] border border-white/5 space-y-8">
-                <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Adventurer Statistics</h3>
-                <div className="grid grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <p className="text-4xl font-black text-white">{library.length}</p>
-                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Adventures</p>
-                  </div>
-                  <div className="space-y-2 border-x border-white/5 px-2">
-                    <p className="text-4xl font-black text-primary">{library.filter(b => b.isDigitalUnlocked || b.pdfUrl).length}</p>
-                    <p className="text-[10px] font-black uppercase text-primary/70 tracking-widest">Unlocked</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-4xl font-black text-white">{orders.length}</p>
-                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Physical</p>
-                  </div>
-                </div>
-              </div>
-
-              {user?.lastShippingAddress && (
-                <div className="bg-slate-950/50 p-10 rounded-[2.5rem] border border-white/5 space-y-6 text-left">
-                  <h3 className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-600">Last Shipping Address</h3>
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold text-white">{user.lastShippingAddress.firstName} {user.lastShippingAddress.lastName}</p>
-                    <p className="text-xs text-slate-400">{user.lastShippingAddress.addressLine1}</p>
-                    {user.lastShippingAddress.addressLine2 && <p className="text-xs text-slate-400">{user.lastShippingAddress.addressLine2}</p>}
-                    <p className="text-xs text-slate-400">
-                      {user.lastShippingAddress.city}, {user.lastShippingAddress.state} {user.lastShippingAddress.postCode}
-                    </p>
-                    <p className="text-[10px] font-black uppercase text-slate-600 mt-2">{user.lastShippingAddress.country}</p>
-                  </div>
-                </div>
-              )}
-
-              {user ? (
-                <div className="space-y-4">
-                  <button onClick={logout} className="w-full h-20 bg-white/5 text-white/50 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[10px] hover:bg-white/10 hover:text-white transition-all border border-white/5 flex items-center justify-center gap-3 active:scale-95 group">
-                    Logout and End Session
-                  </button>
-                  <button onClick={() => setShowDeleteDialog(true)} className="w-full h-14 bg-red-500/5 text-red-500/50 rounded-xl font-black uppercase tracking-[0.2em] text-[8px] hover:bg-red-500/10 hover:text-red-500 transition-all border border-red-500/10 flex items-center justify-center gap-3 active:scale-95 group">
-                    <Trash2 size={12} className="group-hover:animate-bounce" /> Delete My Account & Data
-                  </button>
-                  <a href="/privacy" target="_blank" className="block text-[8px] font-black uppercase text-slate-600 hover:text-primary transition-colors text-center tracking-widest">
-                    Terms & Privacy Policy
-                  </a>
-                </div>
-              ) : (
-                <Button onClick={() => login()} size="lg" className="h-20 rounded-[1.5rem] font-black uppercase tracking-widest shadow-2xl">Sign In with Google</Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <AccountSection 
+          user={user}
+          orders={orders}
+          library={library}
+          onLogout={logout}
+          onDeleteRequest={() => setShowDeleteDialog(true)}
+          onLogin={login}
+        />
       )}
       {/* Parental Gate Modal */}
-      <Dialog open={showParentalGate} onOpenChange={setShowParentalGate}>
-        <DialogContent className="max-w-md bg-slate-900 border-white/10 text-white rounded-[2rem]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight text-center">Parents Only</DialogTitle>
-          </DialogHeader>
-          <div className="p-6 text-center space-y-6">
-            <div className="bg-slate-800 p-8 rounded-3xl border border-white/5 shadow-inner">
-              <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-2">Solve this to continue</p>
-              <h3 className="text-4xl font-black text-primary">{parentalProblem.q} = ?</h3>
-            </div>
-            <input
-              type="number"
-              value={parentalAnswer}
-              onChange={(e) => setParentalGateAnswer(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && verifyParentalGate()}
-              className="w-full h-16 bg-slate-800 rounded-2xl text-center text-2xl font-black outline-none border-2 border-transparent focus:border-primary/50 transition-all"
-              placeholder="Result"
-              autoFocus
-            />
-            <Button 
-              onClick={verifyParentalGate}
-              className="w-full h-16 rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-primary/20"
-            >
-              Verify & Order
-            </Button>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Verification required for children's app safety</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ParentalGateDialog 
+        open={showParentalGate}
+        onOpenChange={setShowParentalGate}
+        problem={parentalProblem}
+        answer={parentalAnswer}
+        onAnswerChange={setParentalGateAnswer}
+        onVerify={verifyParentalGate}
+      />
 
       {/* Ominous Report Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent className="max-w-md bg-slate-950 border-red-900/50 text-white rounded-[2rem] shadow-[0_0_50px_rgba(220,38,38,0.15)]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-red-500 text-center flex items-center justify-center gap-2">
-              <Flag size={24} className="fill-current" /> Safety Intervention
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-6 space-y-6">
-            <div className="bg-red-950/20 p-6 rounded-2xl border border-red-900/30 text-center">
-              <p className="text-red-200/70 text-xs font-bold uppercase tracking-widest leading-relaxed">
-                You are about to flag content as inappropriate. This action will trigger a formal human review of the story and associated AI models.
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Nature of Concern</label>
-              <textarea 
-                value={reportData.reason}
-                onChange={(e) => setReportData({ ...reportData, reason: e.target.value })}
-                className="w-full h-32 bg-slate-900 rounded-2xl p-4 text-sm outline-none border-2 border-transparent focus:border-red-600/50 transition-all resize-none placeholder:text-slate-700"
-                placeholder="Describe the violation in detail..."
-              />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <Button 
-                onClick={submitReport}
-                disabled={isSubmittingReport}
-                className="w-full h-16 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all disabled:opacity-50"
-              >
-                {isSubmittingReport ? <Loader2 className="animate-spin" /> : "File Formal Report"}
-              </Button>
-              <button 
-                onClick={() => setShowReportDialog(false)}
-                className="w-full py-2 text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ReportDialog 
+        open={showReportDialog}
+        onOpenChange={setShowReportDialog}
+        reason={reportData.reason}
+        onReasonChange={(val) => setReportData({ ...reportData, reason: val })}
+        onSubmit={submitReport}
+        loading={isSubmittingReport}
+      />
 
       {/* Ominous Account Termination Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-w-md bg-slate-950 border-red-900/50 text-white rounded-[2rem] shadow-[0_0_50px_rgba(220,38,38,0.15)]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-red-500 text-center flex items-center justify-center gap-2">
-              <Trash2 size={24} /> Account Termination
-            </DialogTitle>
-          </DialogHeader>
-          <div className="p-6 space-y-6">
-            <div className="bg-red-950/20 p-6 rounded-2xl border border-red-900/30 text-center">
-              <p className="text-red-200/70 text-xs font-bold uppercase tracking-widest leading-relaxed">
-                This process is irreversible. All of your stories, images, and profile data will be permanently wiped from our secure vault.
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Confirm Identity</label>
-              <p className="text-[10px] text-slate-400 mb-2">Please type <span className="text-red-500 font-black italic">DELETE</span> to confirm your intent.</p>
-              <input 
-                type="text"
-                value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
-                className="w-full h-16 bg-slate-900 rounded-2xl text-center text-xl font-black outline-none border-2 border-transparent focus:border-red-600/50 transition-all placeholder:text-slate-800"
-                placeholder="---"
-              />
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <Button 
-                onClick={deleteAccount}
-                disabled={isDeletingAccount || deleteConfirmation !== 'DELETE'}
-                className="w-full h-16 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all disabled:opacity-20"
-              >
-                {isDeletingAccount ? <Loader2 className="animate-spin" /> : "Terminate Account"}
-              </Button>
-              <button 
-                onClick={() => setShowDeleteDialog(false)}
-                className="w-full py-2 text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
-              >
-                Cancel and Stay
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DeleteAccountDialog 
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        confirmation={deleteConfirmation}
+        onConfirmationChange={setDeleteConfirmation}
+        onDelete={deleteAccount}
+        loading={isDeletingAccount}
+      />
     </div>
   )
 }
 
-function Separator() {
-  return <div className="h-px bg-white/10 w-full my-6" />;
-}
 
-function MagicGallery() {
-  const testimonials = [
-    {
-      type: 'video',
-      thumbnail: '/assets/testimonials/testimonial-1.png',
-      title: 'Pure Joy & Wonder',
-      user: 'Sarah, Mom of 2',
-      duration: '0:45'
-    },
-    {
-      type: 'image',
-      thumbnail: '/assets/testimonials/testimonial-2.png',
-      title: 'Boutique Print Quality',
-      user: 'Verified Purchase',
-      text: 'The hardcover feels premium. A real keepsake for our family library.'
-    },
-    {
-      type: 'video',
-      thumbnail: '/assets/testimonials/testimonial-3.png',
-      title: 'Laughing Together',
-      user: 'Emma, New Parent',
-      duration: '1:12'
-    },
-    {
-      type: 'image',
-      thumbnail: '/assets/testimonials/testimonial-4.png',
-      title: 'Reading by Fairy Light',
-      user: 'David, Proud Dad',
-      text: 'My children were mesmerized seeing themselves in the illustrations.'
-    },
-    {
-      type: 'image',
-      thumbnail: '/assets/testimonials/testimonial-5.png',
-      title: 'Vibrant AI Art',
-      user: 'Art Director',
-      text: 'The colors are so vivid on paper. The AI perfectly captured my child.'
-    },
-    {
-      type: 'video',
-      thumbnail: '/assets/testimonials/testimonial-6.png',
-      title: 'Unboxing Grandma\'s Gift',
-      user: 'Grandma Linda',
-      duration: '0:58'
-    },
-    {
-      type: 'image',
-      thumbnail: '/assets/testimonials/testimonial-7.png',
-      title: 'Bedtime New Favorite',
-      user: 'Jessica, Educator',
-      text: 'A game-changer for our evening routine. Personalized and magical.'
-    },
-    {
-      type: 'image',
-      thumbnail: '/assets/testimonials/testimonial-8.png',
-      title: 'Hugging His Adventure',
-      user: 'Liam\'s Family',
-      text: 'He won\'t let go of his book! He thinks he is a real superhero now.'
-    },
-    {
-      type: 'video',
-      thumbnail: '/assets/testimonials/testimonial-9.png',
-      title: 'A Family Moment',
-      user: 'The Miller Family',
-      duration: '1:30'
-    },
-    {
-      type: 'image',
-      thumbnail: '/assets/testimonials/testimonial-10.png',
-      title: 'Magical Sunset Reading',
-      user: 'Nature Explorers',
-      text: 'Took our WonderStory to the park. It truly felt like a treasure hunt.'
-    }
-  ];
-
-  return (
-    <div className="space-y-8 pt-12 pb-20">
-      <div className="flex items-center justify-between px-4">
-        <div className="space-y-1">
-          <h3 className="text-2xl font-black uppercase tracking-tighter text-white">Magic in Action</h3>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Real stories from real families</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="w-8 h-8 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center text-slate-500"><ChevronLeft size={16} /></div>
-          <div className="w-8 h-8 rounded-full bg-slate-900 border border-white/5 flex items-center justify-center text-white"><ChevronRight size={16} /></div>
-        </div>
-      </div>
-
-      <div className="flex gap-6 overflow-x-auto px-4 pb-8 no-scrollbar snap-x snap-mandatory">
-        {testimonials.map((item, i) => (
-          <div key={i} className="min-w-[280px] md:min-w-[320px] aspect-[4/5] bg-slate-900/50 rounded-[2.5rem] border border-white/5 relative overflow-hidden snap-start group cursor-pointer hover:border-primary/30 transition-all">
-            <img src={item.thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-700" alt={item.title} />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
-            
-            <div className="absolute inset-0 p-8 flex flex-col justify-end">
-              {item.type === 'video' && (
-                <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                  <Play className="text-white fill-current" size={20} />
-                </div>
-              )}
-              <h4 className="text-lg font-black uppercase tracking-tighter text-white leading-tight mb-1">{item.title}</h4>
-              <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">{item.user}</p>
-              {item.text && <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 italic">"{item.text}"</p>}
-              {item.duration && <span className="text-[8px] font-black text-slate-500 uppercase">{item.duration} MIN CLIP</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
