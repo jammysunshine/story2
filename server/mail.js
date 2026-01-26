@@ -91,7 +91,7 @@ function getPdfReadyTemplate(customerName, bookTitle, signedPdfUrl, libraryUrl) 
       </p>
 
       <div style="text-align: center; color: #aaa; font-size: 12px; padding-top: 20px; border-top: 1px solid #eee; margin-top: 40px;">
-        © 2026 AI StoryTime. All rights reserved.
+        © 2026 WonderStories AI. All rights reserved.
       </div>
     </div>
   `;

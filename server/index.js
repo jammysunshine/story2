@@ -1025,7 +1025,7 @@ app.get('/privacy', (req, res) => {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Privacy Policy | AI StoryTime</title>
+      <title>Privacy Policy | WonderStories AI</title>
       <style>
         body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; }
         h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -1047,6 +1047,8 @@ app.get('/privacy', (req, res) => {
       
       <h2>4. Contact</h2>
       <p>For any questions, please contact us via the app feedback system.</p>
+      
+      <p style="margin-top: 50px; color: #999; font-size: 12px;">© 2026 WonderStories AI</p>
     </body>
     </html>
   `);
