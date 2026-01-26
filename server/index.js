@@ -532,8 +532,22 @@ app.get('/api/user/library', async (req, res) => {
       ]
     }).sort({ createdAt: -1 }).toArray();
 
-    logger.info(`📚 [LIBRARY_FETCH] Found ${books.length} books for ${email}`);
-    res.json({ success: true, books });
+    // Sign URLs for bookshelf access
+    const { get7DaySignedUrl } = require('./pdfService');
+    const securedBooks = await Promise.all(books.map(async book => {
+      // Sign first page image for thumbnail
+      if (book.pages && book.pages.length > 0 && book.pages[0].imageUrl) {
+        book.pages[0].imageUrl = await getSignedUrl(book.pages[0].imageUrl);
+      }
+      // Sign PDF URL if it exists
+      if (book.pdfUrl) {
+        book.pdfUrl = await get7DaySignedUrl(book.pdfUrl);
+      }
+      return book;
+    }));
+
+    logger.info(`📚 [LIBRARY_FETCH] Found ${securedBooks.length} books for ${email}`);
+    res.json({ success: true, books: securedBooks });
   } catch (error) {
     logger.error({ err: error, email }, 'Error fetching library');
     res.status(500).json({ error: 'Internal server error' });
