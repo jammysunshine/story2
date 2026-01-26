@@ -1371,7 +1371,7 @@ export default function MainCreator() {
                     )}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-8 pt-20">
                       <div className="flex flex-wrap gap-2 mb-3">
-                        {b.status === 'pdf_ready' ? (
+                        {b.pdfUrl ? (
                           <Badge className="bg-green-500/20 text-green-400 border-green-500/30 uppercase text-[10px] font-black px-3 py-1">✅ Ready</Badge>
                         ) : b.status === 'paid' ? (
                           <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 uppercase text-[10px] font-black px-3 py-1 animate-pulse">🎨 Painting...</Badge>

@@ -11,6 +11,14 @@ steps:
           --cache-to=type=registry,ref=$_AR_HOSTNAME/$PROJECT_ID/ai-storytime-backend/$_BACKEND_SERVICE_NAME:buildcache,mode=max \
           -t $_AR_HOSTNAME/$PROJECT_ID/ai-storytime-backend/$_BACKEND_SERVICE_NAME:latest \
           --file Dockerfile.backend \
+          --build-arg VITE_REVIEWER_BOOK_ID=$_VITE_REVIEWER_BOOK_ID \
+          --build-arg VITE_STORY_TEASER_PAGES_COUNT=$_VITE_STORY_TEASER_PAGES_COUNT \
+          --build-arg VITE_STORY_COST=$_VITE_STORY_COST \
+          --build-arg VITE_IMAGE_COST=$_VITE_IMAGE_COST \
+          --build-arg VITE_PDF_COST=$_VITE_PDF_COST \
+          --build-arg VITE_PRINT_PRICE=$_VITE_PRINT_PRICE \
+          --build-arg VITE_BASE_CURRENCY=$_VITE_BASE_CURRENCY \
+          --build-arg VITE_GOOGLE_CLIENT_ID=$_VITE_GOOGLE_CLIENT_ID \
           --push \
           .
 
@@ -51,3 +59,11 @@ substitutions:
   _DEPLOY_REGION: australia-southeast1
   _AR_HOSTNAME: australia-southeast1-docker.pkg.dev
   _BACKEND_SERVICE_NAME: storytime-backend
+  _VITE_REVIEWER_BOOK_ID: "697736eadd2afbb4f929b2ff"
+  _VITE_STORY_TEASER_PAGES_COUNT: "7"
+  _VITE_STORY_COST: "10"
+  _VITE_IMAGE_COST: "2"
+  _VITE_PDF_COST: "9.99"
+  _VITE_PRINT_PRICE: "49.99"
+  _VITE_BASE_CURRENCY: "usd"
+  _VITE_GOOGLE_CLIENT_ID: "959069445137-v0v6jrreojcrclbi6skclrvgn6dr6vgs.apps.googleusercontent.com"
