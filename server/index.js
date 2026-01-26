@@ -19,7 +19,7 @@ const logger = require('./logger');
 dotenv.config();
 
 // Import mail module AFTER environment variables are loaded
-const { sendStoryEmail } = require('./mail');
+const { sendStoryEmail, sendAdminNotification } = require('./mail');
 
 const app = express();
 
@@ -1078,18 +1078,50 @@ app.get('/privacy', (req, res) => {
 // --- USER DATA & SAFETY ROUTES ---
 
 app.post('/api/report-content', async (req, res) => {
-  const { bookId, pageNumber, reason } = req.body;
+  const { bookId, pageNumber, reason, reporterEmail } = req.body;
   try {
-    logger.info(`🚩 [CONTENT_REPORT] Book: ${bookId}, Page: ${pageNumber}, Reason: ${reason}`);
+    logger.info(`🚩 [CONTENT_REPORT] Book: ${bookId}, Page: ${pageNumber}, Reason: ${reason}, Reporter: ${reporterEmail}`);
     
-    // Store report in a dedicated collection
-    await db.collection('reports').insertOne({
+    // Fetch the book to get the actual content for the alert
+    const book = await db.collection('books').findOne({ _id: new ObjectId(bookId) });
+    const reportedPage = book?.pages?.find(p => p.pageNumber === parseInt(pageNumber));
+
+    const reportData = {
       bookId: new ObjectId(bookId),
       pageNumber,
       reason,
+      reporterEmail: reporterEmail || 'anonymous',
+      content: reportedPage ? {
+        text: reportedPage.text,
+        imageUrl: reportedPage.imageUrl
+      } : null,
       status: 'pending',
       createdAt: new Date()
-    });
+    };
+
+    // Store report in a dedicated collection
+    await db.collection('reports').insertOne(reportData);
+
+    // Immediate Alert to Admin with FULL CONTEXT (including signed image and PDF)
+    const adminImageUrl = reportedPage?.imageUrl ? await getSignedUrl(reportedPage.imageUrl) : null;
+    let adminPdfUrl = null;
+    if (book?.pdfUrl) {
+      const { get7DaySignedUrl } = require('./pdfService');
+      adminPdfUrl = await get7DaySignedUrl(book.pdfUrl);
+    }
+    
+    await sendAdminNotification(
+      `Content Report: Book ${bookId}`,
+      `A user (${reportData.reporterEmail}) has reported inappropriate content.\n\n` +
+      `**Book ID:** ${bookId}\n` +
+      `**Page Number:** ${pageNumber}\n` +
+      `**Reason:** ${reason}\n\n` +
+      `--- REPORTED CONTENT ---\n` +
+      `**Story Text:** "${reportedPage?.text || 'N/A'}"\n\n` +
+      (adminPdfUrl ? `**Full Book PDF:** ${adminPdfUrl}\n\n` : '') +
+      `Please take action within 24 hours to comply with App Store safety policies.`,
+      adminImageUrl
+    );
 
     res.json({ success: true, message: 'Report received. Our safety team will review this content.' });
   } catch (error) {
@@ -1111,18 +1143,61 @@ app.delete('/api/user/account', async (req, res) => {
   try {
     logger.warn(`🗑️ [ACCOUNT_DELETION] Request for user: ${email}`);
     
-    // 1. Delete user record
+    // 1. Find all books belonging to this user
+    const userBooks = await db.collection('books').find({ 
+      $or: [{ userId: email.toLowerCase() }, { email: email.toLowerCase() }] 
+    }).toArray();
+
+    logger.info(`🗑️ [ACCOUNT_DELETION] Found ${userBooks.length} books to purge for ${email}`);
+
+    // 2. Delete files from GCS for each book
+    const pdfBucket = storage.bucket(process.env.GCS_PDFS_BUCKET_NAME);
+    const imagesBucket = storage.bucket(process.env.GCS_IMAGES_BUCKET_NAME);
+
+    for (const book of userBooks) {
+      const bookIdStr = book._id.toString();
+      
+      // Delete PDF if exists
+      if (book.pdfUrl) {
+        try {
+          await pdfBucket.file(`pdfs/${bookIdStr}.pdf`).delete().catch(() => {});
+          logger.debug(`Deleted PDF for book ${bookIdStr}`);
+        } catch (e) { /* ignore file not found */ }
+      }
+
+      // Delete Images if they exist
+      if (book.pages) {
+        for (const page of book.pages) {
+          if (page.imageUrl && page.imageUrl.includes(process.env.GCS_IMAGES_BUCKET_NAME)) {
+            try {
+              // Extract file path from URL
+              const path = new URL(page.imageUrl).pathname.split('/').slice(2).join('/');
+              await imagesBucket.file(path).delete().catch(() => {});
+            } catch (e) { /* ignore */ }
+          }
+        }
+        logger.debug(`Deleted ${book.pages.length} images for book ${bookIdStr}`);
+      }
+
+      // Delete Hero Photo if exists
+      if (book.photoUrl && book.photoUrl.includes(process.env.GCS_IMAGES_BUCKET_NAME)) {
+        try {
+          const path = new URL(book.photoUrl).pathname.split('/').slice(2).join('/');
+          await imagesBucket.file(path).delete().catch(() => {});
+          logger.debug(`Deleted hero photo for book ${bookIdStr}`);
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    // 3. Delete user record
     await db.collection('users').deleteOne({ email: email.toLowerCase() });
     
-    // 2. Mark books as orphaned (or delete them if preferred)
-    // We'll mark them as deleted but keep the files for audit logs if needed, 
-    // or you can choose to fully wipe them.
-    await db.collection('books').updateMany(
-      { userId: email.toLowerCase() },
-      { $set: { status: 'deleted', deletedAt: new Date() } }
-    );
+    // 4. Delete all book records
+    await db.collection('books').deleteMany({ 
+      $or: [{ userId: email.toLowerCase() }, { email: email.toLowerCase() }] 
+    });
 
-    res.json({ success: true, message: 'Your account and associated data have been queued for deletion.' });
+    res.json({ success: true, message: 'Your account and all associated data have been permanently deleted.' });
   } catch (error) {
     logger.error({ err: error, email }, 'Error during account deletion');
     res.status(500).json({ error: 'Failed to delete account' });

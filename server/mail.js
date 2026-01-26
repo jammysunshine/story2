@@ -97,4 +97,35 @@ function getPdfReadyTemplate(customerName, bookTitle, signedPdfUrl, libraryUrl) 
   `;
 }
 
-module.exports = { sendStoryEmail, sendShippingEmail, getPdfReadyTemplate };
+async function sendAdminNotification(subject, text, imageUrl = null) {
+  const mailOptions = {
+    from: `"WonderStories System" <${process.env.SMTP_USER}>`,
+    to: process.env.SMTP_USER, // Send to yourself
+    subject: `🚨 [ADMIN ALERT] ${subject}`,
+    html: `
+      <div style="font-family: sans-serif; padding: 20px; border: 2px solid #ef4444; border-radius: 10px; max-width: 600px;">
+        <h1 style="color: #ef4444; margin-top: 0;">Safety Report Received</h1>
+        <p style="font-size: 16px;">${text.replace(/\n/g, '<br>')}</p>
+        
+        ${imageUrl ? `
+          <div style="margin: 20px 0; border: 1px solid #eee; padding: 10px; border-radius: 8px; text-align: center;">
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Reported Image:</p>
+            <img src="${imageUrl}" style="max-width: 100%; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" alt="Reported Content" />
+          </div>
+        ` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <p style="font-size: 12px; color: #666;">Action required within 24 hours to comply with App Store safety policies.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`🚨 Admin alert sent: ${subject}`);
+  } catch (error) {
+    console.error('❌ Failed to send admin alert:', error);
+  }
+}
+
+module.exports = { sendStoryEmail, sendShippingEmail, getPdfReadyTemplate, sendAdminNotification };

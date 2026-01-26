@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star, BookOpen, Sparkles, User as CircleUser, FileText } from 'lucide-react';
+import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star, BookOpen, Sparkles, User as CircleUser, FileText, Flag } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -12,6 +12,23 @@ export default function SuccessPage() {
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+
+  const reportContent = async (pageNumber: number) => {
+    const reason = window.prompt('Please describe why you are reporting this content (e.g., offensive image, inappropriate text):');
+    if (!reason) return;
+
+    try {
+      await axios.post(`${API_URL}/report-content`, {
+        bookId,
+        reporterEmail: user?.email || 'anonymous',
+        pageNumber,
+        reason
+      });
+      alert("Report Submitted. Thank you. Our safety team will review this content.");
+    } catch (e) {
+      console.error('Failed to submit report:', e);
+    }
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
@@ -249,6 +266,12 @@ export default function SuccessPage() {
                   className="mt-6 w-full h-14 bg-white/10 text-white rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-white/20 active:scale-95 transition-all group"
                 >
                   <BookOpen className="text-primary" /> Go to My Bookshelf
+                </button>
+                <button
+                  onClick={() => reportContent(1)}
+                  className="mt-4 w-full py-2 text-slate-600 hover:text-red-400 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                >
+                  <Flag size={12} /> Report Inappropriate Content
                 </button>
               </div>
             </div>

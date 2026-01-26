@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser, FileDown } from 'lucide-react'
+import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser, FileDown, Flag } from 'lucide-react'
 import axios from 'axios'
 import {
   Sheet,
@@ -642,7 +642,12 @@ export default function MainCreator() {
   };
 
   const deleteAccount = async () => {
-    if (!window.confirm('CRITICAL: Are you sure? This will delete your account and all your saved stories. This cannot be undone.')) return;
+    const confirmation = window.prompt('CRITICAL: This will permanently delete your account, all your stories, and all your images. This action cannot be undone.\n\nType "DELETE" to confirm:');
+    
+    if (confirmation !== 'DELETE') {
+      toast({ title: "Deletion Cancelled", description: "Confirmation text did not match." });
+      return;
+    }
 
     try {
       const res = await axios.delete(`${API_URL}/user/account`, {
@@ -664,6 +669,7 @@ export default function MainCreator() {
     try {
       await axios.post(`${API_URL}/report-content`, {
         bookId: book?.bookId,
+        reporterEmail: user?.email || 'anonymous',
         pageNumber,
         reason
       });
@@ -1201,9 +1207,9 @@ export default function MainCreator() {
                         <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg relative">
                           <button
                             onClick={() => reportContent(p.pageNumber)}
-                            className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1"
+                            className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1 bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/5"
                           >
-                            <Trash2 size={10} /> Report Content
+                            <Flag size={10} className="fill-current" /> Report Inappropriate Content
                           </button>
                           <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
                         </div>
@@ -1389,16 +1395,29 @@ export default function MainCreator() {
                     </div>
                   </div>
 
-                  {/* Direct Download Button for bookshelf cards */}
-                  {b.pdfUrl && (
-                    <a
-                      href={b.pdfUrl}
-                      target="_blank"
-                      className="w-full h-12 bg-white/5 hover:bg-primary text-white rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10 group-hover:border-primary/50"
+                  <div className="flex gap-2">
+                    {/* Direct Download Button for bookshelf cards */}
+                    {b.pdfUrl && (
+                      <a
+                        href={b.pdfUrl}
+                        target="_blank"
+                        className="flex-1 h-12 bg-white/5 hover:bg-primary text-white rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10 group-hover:border-primary/50"
+                      >
+                        <FileDown size={14} /> Download PDF
+                      </a>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // For bookshelf, we report the book generally (page 1 context)
+                        reportContent(1); 
+                      }}
+                      className="w-12 h-12 bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-xl transition-all flex items-center justify-center border border-white/10"
+                      title="Report Inappropriate Content"
                     >
-                      <FileDown size={14} /> Download PDF
-                    </a>
-                  )}
+                      <Flag size={16} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
