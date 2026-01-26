@@ -52,11 +52,11 @@ if (missingVars.length > 0) {
 // --- GLOBAL SAFETY NETS ---
 
 process.on('uncaughtException', (err) => {
-  logger.error('🔥 CRITICAL: Uncaught Exception!', { message: err.message, stack: err.stack });
+  logger.error({ err }, '🔥 CRITICAL: Uncaught Exception!');
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error('🔥 CRITICAL: Unhandled Rejection!', { reason: reason?.message || reason, stack: reason?.stack });
+  logger.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, '🔥 CRITICAL: Unhandled Rejection!');
 });
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -426,7 +426,7 @@ app.post('/api/generate-story', async (req, res) => {
 
     res.json({ success: true, bookId: bookIdObj.toString(), ...storyData });
   } catch (error) {
-    logger.error({ msg: 'Story gen failed', error: error.message });
+    logger.error({ err: error }, 'Story gen failed');
     res.status(500).json({ error: error.message });
   }
 });
@@ -440,14 +440,10 @@ app.post('/api/generate-images', async (req, res) => {
     const isFulfillment = ['paid', 'printing', 'printing_test', 'pdf_ready'].includes(book?.status || '');
 
     generateImages(db, bookId, isFulfillment).catch(err => {
-      logger.error('💥 [IMAGE_GEN_CRASH]', {
-        message: err.message,
-        stack: err.stack,
-        bookId
-      });
+      logger.error({ err, bookId }, '💥 [IMAGE_GEN_CRASH]');
     });
   } catch (e) {
-    logger.error('Failed to start image generation:', e.message);
+    logger.error({ err: e, bookId }, 'Failed to start image generation');
   }
 });
 
@@ -539,7 +535,7 @@ app.get('/api/user/library', async (req, res) => {
     logger.info(`📚 [LIBRARY_FETCH] Found ${books.length} books for ${email}`);
     res.json({ success: true, books });
   } catch (error) {
-    logger.error('Error fetching library:', error.message);
+    logger.error({ err: error, email }, 'Error fetching library');
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -566,7 +562,7 @@ app.get('/api/book-status', async (req, res) => {
     // console.log(`[DEBUG] /api/book-status for ${bookId}: status=${book.status}, pagesWithImages=${securedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length}`);
     res.json({ status: book.status, pages: securedPages, pdfUrl: signedPdfUrl });
   } catch (error) {
-    logger.error(`Error in /api/book-status: ${error.message}`);
+    logger.error({ err: error, bookId }, 'Error in /api/book-status');
     res.status(500).json({ error: error.message });
   }
 });
@@ -586,20 +582,20 @@ app.post('/api/generate-pdf', async (req, res) => {
 
     if (emailRecipient) {
       const { sendStoryEmail } = require('./mail');
-      logger.info(`📡 [EMAIL_TRIGGER] Attempting to send PDF email to: ${emailRecipient} (Found in ${book?.userId ? 'userId' : 'customerEmail'})`);
+      logger.info(`📡 [EMAIL_TRIGGER] Attempting to send PDF email to: ${emailRecipient}`);
       try {
         await sendStoryEmail(emailRecipient, book.title, signedUrl);
         logger.info(`✅ [EMAIL_TRIGGER] SUCCESS! PDF ready email sent to ${emailRecipient}`);
       } catch (emailError) {
-        logger.error(`❌ [EMAIL_TRIGGER] FAILED to send email to ${emailRecipient}: ${emailError.message}`);
+        logger.error({ err: emailError, bookId, emailRecipient }, '❌ [EMAIL_TRIGGER] FAILED to send email');
       }
     } else {
-      logger.warn(`⚠️ [EMAIL_TRIGGER] SKIPPED: No recipient email found in record for book ${bookId}. Fields: { userId: ${book?.userId}, customerEmail: ${book?.customerEmail} }`);
+      logger.warn(`⚠️ [EMAIL_TRIGGER] SKIPPED: No recipient email found in record for book ${bookId}`);
     }
 
     res.json({ success: true, pdfUrl: signedUrl });
   } catch (error) {
-    logger.error(`💥 [PDF_GEN] FAILED for Book ${bookId}: ${error.message}`);
+    logger.error({ err: error, bookId }, '💥 [PDF_GEN] FAILED for Book');
     res.status(500).json({ error: error.message });
   }
 });
@@ -611,7 +607,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
     // FIX: Use req.body directly as it's already a Buffer from express.raw middleware
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    logger.error(`❌ Webhook signature verification failed: ${err.message}`);
+    logger.error({ err }, '❌ Webhook signature verification failed');
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -707,7 +703,7 @@ app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, 
     // 4. Trigger Background Tasks (Painting + PDF + Gelato)
     // Run these as background tasks
     handleCheckoutComplete(session, bookId, db, type, orderData).catch(err => {
-      logger.error('Fulfillment Background Task Failed:', err);
+      logger.error({ err, bookId }, 'Fulfillment Background Task Failed');
     });
   }
 
@@ -841,7 +837,7 @@ async function handleCheckoutComplete(session, bookId, db, type = 'book', orderD
     logger.info(`✅ [LIFECYCLE_TRACKER] FINISHED full fulfillment for Book: ${bookId}`);
 
   } catch (error) {
-    logger.error('❌ Error processing checkout completion:', error);
+    logger.error({ err: error, bookId }, '❌ Error processing checkout completion');
 
     await db.collection('books').updateOne(
       { _id: new ObjectId(bookId) },
@@ -989,6 +985,6 @@ app.listen(port, '0.0.0.0', () => {
   
   // Connect to database in the background
   connectDB().catch(err => {
-    logger.error('❌ Failed to connect to MongoDB:', err.message);
+    logger.error({ err }, '❌ Failed to connect to MongoDB');
   });
 });

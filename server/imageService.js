@@ -24,7 +24,7 @@ async function callGeminiImageGen(params) {
   try {
     const apiKey = process.env.GOOGLE_API_KEY;
     if (apiKey) {
-      log.info(`🤖 [Page ${pageNumber}] Attempting Gemini Pro...`);
+      log.info(`🤖 [Page ${pageNumber}] Attempting Gemini Pro...`, { pageNumber });
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: process.env.GOOGLE_IMAGE_MODEL || 'gemini-2.5-flash-image' });
 
@@ -32,7 +32,7 @@ async function callGeminiImageGen(params) {
       let hasImages = false;
 
       if (referenceImages && referenceImages.length > 0) {
-        log.info(`📸 [Page ${pageNumber}] Preparing ${referenceImages.length} references for Gemini...`);
+        log.info(`📸 [Page ${pageNumber}] Preparing ${referenceImages.length} references for Gemini...`, { pageNumber, refCount: referenceImages.length });
         for (const ref of referenceImages) {
           try {
             const bucketName = process.env.GCS_IMAGES_BUCKET_NAME;
@@ -50,7 +50,7 @@ async function callGeminiImageGen(params) {
               path = ref.uri;
             }
 
-            log.debug(`📸 [Page ${pageNumber}] Resolved reference path: ${path}`);
+            log.debug(`📸 [Page ${pageNumber}] Resolved reference path: ${path}`, { pageNumber, path });
             const file = bucket.file(path);
             const [metadata] = await file.getMetadata();
             const [buffer] = await file.download();
@@ -62,18 +62,18 @@ async function callGeminiImageGen(params) {
               }
             });
             hasImages = true;
-            log.debug(`📸 [Page ${pageNumber}] Attached: ${path} (${metadata.contentType}, size: ${Math.round(buffer.length / 1024)} KB)`);
+            log.debug(`📸 [Page ${pageNumber}] Attached: ${path} (${metadata.contentType}, size: ${Math.round(buffer.length / 1024)} KB)`, { pageNumber, path, size: buffer.length });
           } catch (refError) {
-            log.warn(`⚠️ [Page ${pageNumber}] Reference Load Fail: ${refError.message}`);
+            log.warn(`⚠️ [Page ${pageNumber}] Reference Load Fail: ${refError.message}`, { pageNumber, err: refError });
           }
         }
       }
 
-      log.info(`📡 [Page ${pageNumber}] Sending Gemini request (Prompt length: ${prompt.length}, Parts: ${parts.length})...`);
+      log.info(`📡 [Page ${pageNumber}] Sending Gemini request (Prompt length: ${prompt.length}, Parts: ${parts.length})...`, { pageNumber, promptLength: prompt.length, partsCount: parts.length });
 
       parts.forEach((part, idx) => {
         if (part.inlineData) {
-          log.info(`📦 Part ${idx} size: ${Math.round(part.inlineData.data.length / 1024)} KB`);
+          log.info(`📦 Part ${idx} size: ${Math.round(part.inlineData.data.length / 1024)} KB`, { pageNumber, partIdx: idx, size: part.inlineData.data.length });
         }
       });
 
@@ -86,11 +86,11 @@ async function callGeminiImageGen(params) {
         const startTime = Date.now();
         const heartbeat = setInterval(() => {
           const elapsed = Math.round((Date.now() - startTime) / 1000);
-          log.info(`💓 [Page ${pageNumber}] Still waiting for Gemini Pro... (${elapsed}s elapsed)`);
+          log.info(`💓 [Page ${pageNumber}] Still waiting for Gemini Pro... (${elapsed}s elapsed)`, { pageNumber, elapsed });
         }, 15000);
 
         try {
-          log.info(`⏳ [Page ${pageNumber}] Waiting for Gemini Pro to paint... (Attempt ${geminiAttempt + 1})`);
+          log.info(`⏳ [Page ${pageNumber}] Waiting for Gemini Pro to paint... (Attempt ${geminiAttempt + 1})`, { pageNumber, attempt: geminiAttempt + 1 });
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error(`Gemini API Timeout (${timeoutMs / 1000}s)`)), timeoutMs)
           );
@@ -102,7 +102,7 @@ async function callGeminiImageGen(params) {
 
           clearInterval(heartbeat);
           const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-          log.info(`✅ [Page ${pageNumber}] Gemini Pro finished painting in ${duration}s`);
+          log.info(`✅ [Page ${pageNumber}] Gemini Pro finished painting in ${duration}s`, { pageNumber, duration });
 
           geminiResult = result.response;
           break;
@@ -111,7 +111,7 @@ async function callGeminiImageGen(params) {
           geminiAttempt++;
           const isOverloaded = netErr.message?.includes('overloaded') || netErr.message?.includes('503');
           if (geminiAttempt < 2 && (netErr.message?.includes('fetch failed') || netErr.message?.includes('timeout') || netErr.message?.includes('Timeout') || netErr.message?.includes('aborted') || isOverloaded)) {
-            log.warn(`🔄 [Page ${pageNumber}] Gemini ${isOverloaded ? 'overloaded' : 'network issue'}, retrying once... Error: ${netErr.message}`);
+            log.warn(`🔄 [Page ${pageNumber}] Gemini ${isOverloaded ? 'overloaded' : 'network issue'}, retrying once... Error: ${netErr.message}`, { pageNumber, err: netErr });
             await new Promise(r => setTimeout(r, 5000));
             continue;
           }
@@ -121,7 +121,7 @@ async function callGeminiImageGen(params) {
 
       const response = geminiResult;
       if (response && response.candidates?.[0]?.finishReason === 'SAFETY') {
-        log.error(`🛡️ SAFETY ALERT: Page ${pageNumber} Gemini prompt was blocked.`);
+        log.error(`🛡️ SAFETY ALERT: Page ${pageNumber} Gemini prompt was blocked.`, { pageNumber });
         return { error: 'SAFETY_FILTER_BLOCK', status: 200, modelUsed: 'gemini' };
       }
 
@@ -129,7 +129,7 @@ async function callGeminiImageGen(params) {
       const imagePart = candidate?.content?.parts?.find((p) => p.inlineData);
       
       if (imagePart?.inlineData?.data) {
-        log.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`);
+        log.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`, { pageNumber, size: imagePart.inlineData.data.length });
         return {
           bytesBase64Encoded: imagePart.inlineData.data,
           modelUsed: 'gemini',
@@ -137,26 +137,27 @@ async function callGeminiImageGen(params) {
         };
       }
 
-      log.warn(`⚠️ [Page ${pageNumber}] Gemini Pro did not return an image. Candidate structure:`, {
+      log.warn(`⚠️ [Page ${pageNumber}] Gemini Pro did not return an image.`, {
+        pageNumber,
         finishReason: candidate?.finishReason,
         partsCount: candidate?.content?.parts?.length,
         hasContent: !!candidate?.content,
-        fullCandidate: JSON.stringify(candidate),
-        prompt: prompt // Added for debugging
+        prompt: prompt
       });
       return { error: 'NO_IMAGE_DATA', status: 200 };
     } else {
-      log.error(`❌ [Page ${pageNumber}] GOOGLE_API_KEY IS MISSING FROM PROCESS.ENV`);
+      log.error(`❌ [Page ${pageNumber}] GOOGLE_API_KEY IS MISSING FROM PROCESS.ENV`, { pageNumber });
       return { error: 'MISSING_API_KEY', status: 500 };
     }
   } catch (geminiError) {
-    log.error(`💥 [Page ${pageNumber}] Gemini Pro network error:`, geminiError.message);
+    log.error(`💥 [Page ${pageNumber}] Gemini Pro network error: ${geminiError.message}`, geminiError);
     const isOverloaded = geminiError.message?.includes('overloaded') || geminiError.message?.includes('503');
     return {
       error: isOverloaded ? 'MODEL_OVERLOADED' : 'NETWORK_ERROR',
       status: isOverloaded ? 503 : 500
     };
   }
+}
 }
 
 async function generateImages(db, bookId, isFulfillment = false) {
@@ -170,11 +171,18 @@ async function generateImages(db, bookId, isFulfillment = false) {
     if (!bookRecord) throw new Error('Book not found in database');
 
     const email = bookRecord.email?.toLowerCase() || 'none';
+    const logContext = { bookId, email, pid, service: 'GI' };
     giLog = {
-      info: (msg, meta) => logger.info(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-      debug: (msg, meta) => logger.debug(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-      warn: (msg, meta) => logger.warn(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
-      error: (msg, meta) => logger.error(`[PID:${pid}][GI][${bookId}][${email}] ${msg} ${meta ? JSON.stringify(meta) : ""}`),
+      info: (msg, meta) => logger.info({ ...logContext, ...meta }, msg),
+      debug: (msg, meta) => logger.debug({ ...logContext, ...meta }, msg),
+      warn: (msg, meta) => logger.warn({ ...logContext, ...meta }, msg),
+      error: (msg, meta) => {
+        if (meta instanceof Error) {
+          logger.error({ ...logContext, err: meta }, msg);
+        } else {
+          logger.error({ ...logContext, ...meta }, msg);
+        }
+      },
     };
 
     giLog.info(`🎯 ========== FUNCTION STARTED ==========`);
@@ -368,7 +376,7 @@ async function generateImages(db, bookId, isFulfillment = false) {
         );
         giLog.info(`🎯 [GenerateImages][PID:${pid}] Initial DB Sync Result: { matched: ${updateResult.matchedCount}, modified: ${updateResult.modifiedCount} }`);
       } catch (dbErr) {
-        giLog.error(`❌ FAILED INITIAL DB SYNC: ${dbErr.message}`, { stack: dbErr.stack });
+        giLog.error('❌ FAILED INITIAL DB SYNC', dbErr);
         throw dbErr;
       }
     }
@@ -595,19 +603,19 @@ async function generateImages(db, bookId, isFulfillment = false) {
       if (pagesToProcessCount === masterPages.length && !isFulfillment) {
         const internalUrl = `http://localhost:${process.env.PORT || 3001}`;
         giLog.info(`🚀 Triggering background PDF generation for book: ${bookId}`);
-        axios.post(`${internalUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed:', e.message));
+        axios.post(`${internalUrl}/api/generate-pdf`, { bookId }).catch(e => giLog.error('⚠️ Auto-PDF trigger failed', e));
       }
 
       const pagesWithImages = updatedPages.filter(p => p.imageUrl && !p.imageUrl.includes('placeholder')).length;
       //giLog.info(`📊 FINAL RESULTS: Total=${updatedPages.length}, WithImages=${pagesWithImages}`);
     } catch (updateError) {
-      giLog.error(`❌ FAILED TO UPDATE BOOK DOCUMENT`, updateError);
+      giLog.error('❌ FAILED TO UPDATE BOOK DOCUMENT', updateError);
     }
 
     giLog.info(`🎯 [LIFECYCLE_TRACKER] PAINTING_COMPLETE: Processing finished for Book: ${bookId}`);
     giLog.info(`🎯 [GenerateImages][PID:${pid}] Execution complete.`);
   } catch (err) {
-    giLog.error(`💥 [FATAL_ENGINE_ERROR] ${err.message}`, { stack: err.stack });
+    giLog.error('💥 [FATAL_ENGINE_ERROR]', err);
     throw err;
   }
 }

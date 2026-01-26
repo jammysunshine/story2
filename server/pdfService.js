@@ -97,7 +97,7 @@ async function generatePdf(db, bookId) {
       if (exists) {
         readyCount++;
       } else {
-        logger.error(`❌ [PDF TRACE] MISSING IMAGE: P${page.pageNumber} at path: ${fileName}`);
+        logger.error({ bookId, pageNumber: page.pageNumber, fileName }, '❌ [PDF TRACE] MISSING IMAGE');
       }
     }
 
@@ -263,7 +263,7 @@ async function generatePdf(db, bookId) {
       logger.info(`🎯 Slice ${i + 1} Diagnostic:`, pageInfo);
 
       // images are pre-decoded
-      await sleep(500);
+      await sleep(50);
 
       const pagePdfBuffer = await page.pdf({
         width: '8in', height: '11in', printBackground: true,
@@ -316,7 +316,7 @@ async function generatePdf(db, bookId) {
     return pdfUrl;
   } catch (error) {
     if (browser) await browser.close();
-    logger.error('❌ [PDF TRACE] FATAL ERROR:', error);
+    logger.error({ err: error, bookId }, '❌ [PDF TRACE] FATAL ERROR');
     throw error;
   }
 }
