@@ -244,6 +244,12 @@ export default function SuccessPage() {
                 <p className="text-sm font-bold text-primary px-6 py-3 bg-primary/10 rounded-2xl border border-primary/20">
                   ✨ You don't need to wait here! We'll email you at {user?.email || 'your email'} when it's ready.
                 </p>
+                <button
+                  onClick={() => navigateToTab('bookshelf')}
+                  className="mt-6 w-full h-14 bg-white/10 text-white rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 hover:bg-white/20 active:scale-95 transition-all group"
+                >
+                  <BookOpen className="text-primary" /> Go to My Bookshelf
+                </button>
               </div>
             </div>
           ) : (

@@ -1032,9 +1032,7 @@ export default function MainCreator() {
           )}
 
           {step === 3 && book && (
-            <>
-              {(() => { console.log("🐛 MainCreator (Step 3): Rendering with book:", book); return null; })()}
-              <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
+            <div className="max-w-lg mx-auto space-y-12 animate-in fade-in duration-1000">
               {/* Check if we're in the painting phase (not all teaser images are done yet) */}
               {(book.status === 'generating' || book.status === 'teaser_generating' || book.status === 'preview' ||
                 (book.status !== 'teaser_ready' && calculateProgress() < 100)) ? (

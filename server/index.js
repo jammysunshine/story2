@@ -989,6 +989,7 @@ app.post('/api/create-checkout', async (req, res) => {
     console.log(`[CHECKOUT_START] bookId=${bookId}, email=${accountEmail}, title=${bookTitle}`);
     
     const appUrl = (process.env.APP_URL || '').trim();
+    console.log(`[CHECKOUT_DEBUG] APP_URL=${appUrl}`);
     if (!appUrl) throw new Error('APP_URL environment variable is missing');
     
     const success_url = `${appUrl}/success?bookId=${bookId}`;
