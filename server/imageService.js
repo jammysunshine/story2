@@ -131,7 +131,12 @@ async function callGeminiImageGen(params) {
       const imagePart = candidate?.content?.parts?.find((p) => p.inlineData);
       
       if (imagePart?.inlineData?.data) {
-        log.info(`📸 Image generated successfully by Gemini Pro (${imagePart.inlineData.data.length} chars)`, { pageNumber, size: imagePart.inlineData.data.length });
+        const dataLength = imagePart.inlineData.data.length;
+        if (dataLength < 10000) {
+          log.warn(`⚠️ [Page ${pageNumber}] Gemini Pro returned suspicious small image data (${dataLength} chars). Treating as NO_IMAGE_DATA.`, { pageNumber, dataLength });
+          return { error: 'IMAGE_TOO_SMALL', status: 200 };
+        }
+        log.info(`📸 Image generated successfully by Gemini Pro (${dataLength} chars)`, { pageNumber, size: dataLength });
         return {
           bytesBase64Encoded: imagePart.inlineData.data,
           modelUsed: 'gemini',
