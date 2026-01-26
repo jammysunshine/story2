@@ -38,7 +38,7 @@ interface Step1HeroProps {
   photoUrl: string;
   setPhotoUrl: (url: string) => void;
   onGenerate: () => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   options: Options;
   randomAnimals: string[];
   randomLessons: string[];

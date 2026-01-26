@@ -73,36 +73,37 @@ const randomOccasions = ['Everyday Adventure', 'Birthday Party', 'Christmas Eve'
 
 const getRandomItem = (array: string[]) => array[Math.floor(Math.random() * array.length)];
 
+interface BookPage {
+  pageNumber: number;
+  text: string;
+  prompt: string;
+  imageUrl?: string;
+  url?: string;
+}
+
+interface Book {
+  _id?: string;
+  bookId?: string;
+  title?: string;
+  childName?: string;
+  pages?: BookPage[];
+  status?: string;
+  heroBible?: string;
+  animalBible?: string;
+  finalPrompt?: string;
+  photoUrl?: string;
+  pdfUrl?: string;
+  isDigitalUnlocked?: boolean;
+  userId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export default function MainCreator() {
   const { toast } = useToast()
   const [step, setStep] = useState(1)
   const [activeTab, setActiveTab] = useState<'creator' | 'bookshelf' | 'account'>('creator')
   const [loading, setLoading] = useState(false)
-  interface BookPage {
-    pageNumber: number;
-    text: string;
-    prompt: string;
-    imageUrl?: string;
-    url?: string;
-  }
-
-  interface Book {
-    _id?: string;
-    bookId?: string;
-    title?: string;
-    childName?: string;
-    pages?: BookPage[];
-    status?: string;
-    heroBible?: string;
-    animalBible?: string;
-    finalPrompt?: string;
-    photoUrl?: string;
-    pdfUrl?: string;
-    isDigitalUnlocked?: boolean;
-    userId?: string;
-    createdAt?: Date;
-    updatedAt?: Date;
-  }
 
   const [book, setBook] = useState<Book | null>(null)
   const bookRef = useRef<Book | null>(null); // To solve stale closure in poller
@@ -752,11 +753,13 @@ export default function MainCreator() {
           headers: { Authorization: user?.token ? `Bearer ${user.token}` : '' }
         });
         loadedBook = { ...res.data, bookId: reviewerBookId, status: 'pdf_ready', isDigitalUnlocked: true };
-        toast({
-          title: "🕵️‍♀️ Reviewer Test Mode Activated",
-          description: `Loaded real book: ${loadedBook.title}`,
-          duration: 5000,
-        });
+        if (loadedBook) {
+          toast({
+            title: "🕵️‍♀️ Reviewer Test Mode Activated",
+            description: `Loaded real book: ${loadedBook.title}`,
+            duration: 5000,
+          });
+        }
       } catch (error) {
         console.error('Failed to fetch reviewer book, falling back to dummy:', error);
         toast({

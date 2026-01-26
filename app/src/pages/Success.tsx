@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star, BookOpen, Sparkles, User as CircleUser, FileText, Flag } from 'lucide-react';
 import axios from 'axios';
+import { Capacitor } from '@capacitor/core';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
