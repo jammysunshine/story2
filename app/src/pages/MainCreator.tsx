@@ -766,7 +766,7 @@ export default function MainCreator() {
           onClick={resetCreator}
           className="text-2xl font-black tracking-tighter uppercase text-primary flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
         >
-          <BookOpen className="text-primary" /> StoryTime
+          <BookOpen className="text-primary" /> WonderStories
         </h1>
 
         <nav className="flex items-center bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 shadow-inner">

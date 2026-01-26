@@ -130,10 +130,14 @@ export default function SuccessPage() {
     <div className="min-h-screen bg-slate-950 text-white p-6 font-sans pb-20">
       <header className="flex flex-col md:flex-row justify-between items-center mb-12 pt-[env(safe-area-inset-top)] gap-6 max-w-7xl mx-auto">
         <h1
-          onClick={() => navigateToTab('creator')}
+          onClick={() => {
+            localStorage.removeItem('book');
+            localStorage.setItem('step', '1');
+            navigateToTab('creator');
+          }}
           className="text-2xl font-black tracking-tighter uppercase text-primary flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
         >
-          <BookOpen className="text-primary" /> StoryTime
+          <BookOpen className="text-primary" /> WonderStories
         </h1>
 
         <nav className="flex items-center bg-slate-900/50 p-1.5 rounded-2xl border border-white/5 shadow-inner">

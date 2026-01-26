@@ -23,7 +23,7 @@ async function sendStoryEmail(email, bookTitle, pdfUrl) {
   );
 
   const mailOptions = {
-    from: `"AI StoryTime" <${process.env.SMTP_USER}>`,
+    from: `"WonderStories AI" <${process.env.SMTP_USER}>`,
     to: email,
     subject: `✨ Your Story is Ready: ${bookTitle}`,
     html: html,

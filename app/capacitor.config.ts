@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.aistorytime.app',
-  appName: 'AI Storytime',
+  appName: 'WonderStories AI',
   webDir: 'dist',
   server: {
     url: 'http://localhost:3000',
