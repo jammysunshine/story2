@@ -123,41 +123,60 @@ async function generatePdf(db, bookId) {
   logger.info(`🔧 Using Chrome executable: ${chromePath}`);
   logger.info(`🔧 Platform detected: ${process.platform}`);
 
-  logger.info('🚀 [PDF TRACE] Attempting to launch Chromium browser...');
-  const browser = await puppeteer.launch({
-    executablePath: chromePath,
-    headless: 'new',
-    timeout: 120000,
-    dumpio: true,
-    args: [
-      '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-      '--disable-gpu', '--no-zygote', '--no-first-run',
-      '--disable-crash-reporter',
-      '--disable-dbus',
-      '--disable-dev-conflicts',
-      '--disable-speech-api',
-      '--disable-sync',
-      '--disable-extensions', '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
-      '--disable-web-security', `--user-data-dir=/tmp/chrome-${crypto.randomUUID()}`,
-      '--disable-features=IsolateOrigins,site-per-process',
-      '--disable-ipc-flooding-protection',
-      '--disable-background-networking',
-      '--disable-gcm',
-      '--disable-variations-service',
-      '--disable-default-apps',
-      '--disable-sync',
-      '--metrics-recording-only',
-      '--password-store=basic',
-      '--use-mock-keychain',
-      '--mute-audio',
-      '--disable-background-timer-throttling',
-      '--disable-client-side-phishing-detection',
-      '--disable-component-extensions-with-background-pages',
-      '--disable-hang-monitor',
-      '--js-flags="--max-old-space-size=512"'
-    ],
-  });
+  // 10-second cooldown to let the server settle after image verification/webhook processing
+  logger.info('⏳ [PDF TRACE] Pre-launch cooldown (10s)...');
+  await sleep(10000);
+
+  let browser;
+  let launchAttempts = 0;
+  const MAX_LAUNCH_ATTEMPTS = 3;
+
+  while (launchAttempts < MAX_LAUNCH_ATTEMPTS) {
+    try {
+      launchAttempts++;
+      logger.info(`🚀 [PDF TRACE] Attempting to launch Chromium browser (Attempt ${launchAttempts}/${MAX_LAUNCH_ATTEMPTS})...`);
+      browser = await puppeteer.launch({
+        executablePath: chromePath,
+        headless: 'new',
+        timeout: 120000,
+        dumpio: true,
+        args: [
+          '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+          '--disable-gpu', '--no-zygote', '--no-first-run',
+          '--disable-crash-reporter',
+          '--disable-dbus',
+          '--disable-dev-conflicts',
+          '--disable-speech-api',
+          '--disable-sync',
+          '--disable-extensions', '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
+          '--disable-web-security', `--user-data-dir=/tmp/chrome-${crypto.randomUUID()}`,
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--disable-ipc-flooding-protection',
+          '--disable-background-networking',
+          '--disable-gcm',
+          '--disable-variations-service',
+          '--disable-default-apps',
+          '--disable-sync',
+          '--metrics-recording-only',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--mute-audio',
+          '--disable-background-timer-throttling',
+          '--disable-client-side-phishing-detection',
+          '--disable-component-extensions-with-background-pages',
+          '--disable-hang-monitor',
+          '--js-flags="--max-old-space-size=512"'
+        ],
+      });
+      break; // Success!
+    } catch (launchError) {
+      logger.error({ err: launchError, attempt: launchAttempts }, '❌ [PDF TRACE] Browser launch failed');
+      if (launchAttempts >= MAX_LAUNCH_ATTEMPTS) throw launchError;
+      logger.info(`⏳ Waiting 5s before retrying launch...`);
+      await sleep(5000);
+    }
+  }
 
   try {
     logger.info('✅ [PDF TRACE] Browser launched successfully');
