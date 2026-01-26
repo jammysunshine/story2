@@ -74,7 +74,7 @@ app.use(cors({
 
 // --- DB CONNECTION MIDDLEWARE ---
 app.use((req, res, next) => {
-  if (!db && req.path !== '/health') {
+  if (!db && req.path !== '/health' && req.path !== '/privacy') {
     return res.status(503).json({ error: 'Database initializing, please retry in a moment.' });
   }
   next();
