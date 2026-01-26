@@ -262,8 +262,8 @@ async function generatePdf(db, bookId) {
 
       logger.info(`🎯 Slice ${i + 1} Diagnostic:`, pageInfo);
 
-      // Reduced sleep since images are pre-decoded
-      await sleep(50);
+      // images are pre-decoded
+      await sleep(500);
 
       const pagePdfBuffer = await page.pdf({
         width: '8in', height: '11in', printBackground: true,

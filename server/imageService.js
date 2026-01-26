@@ -141,7 +141,8 @@ async function callGeminiImageGen(params) {
         finishReason: candidate?.finishReason,
         partsCount: candidate?.content?.parts?.length,
         hasContent: !!candidate?.content,
-        fullCandidate: JSON.stringify(candidate)
+        fullCandidate: JSON.stringify(candidate),
+        prompt: prompt // Added for debugging
       });
       return { error: 'NO_IMAGE_DATA', status: 200 };
     } else {
