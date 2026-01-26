@@ -21,10 +21,10 @@ async function generateAsset(prompt, fileName) {
     }
 
     const buffer = Buffer.from(imagePart.inlineData.data, 'base64');
-    // Save to the root app/ folder
-    const filePath = path.join(__dirname, '..', '..', 'app', fileName);
+    // Save to the app/assets/ folder (Single Source of Truth)
+    const filePath = path.join(__dirname, '..', '..', 'app', 'assets', fileName);
     fs.writeFileSync(filePath, buffer);
-    console.log(`✅ Saved ${fileName} to /app (${Math.round(buffer.length / 1024)} KB)`);
+    console.log(`✅ Saved ${fileName} to /app/assets (${Math.round(buffer.length / 1024)} KB)`);
   } catch (error) {
     console.error(`❌ Failed to generate ${fileName}:`, error.message);
   }
@@ -33,7 +33,7 @@ async function generateAsset(prompt, fileName) {
 async function run() {
   const iconPrompt = "A simple, high-quality 3D mobile app icon of a magical glowing children's book with floating sparkles. Soft Pixar-style textures, bold colors, centered composition, high resolution. Solid deep navy blue background. Professional mobile app icon aesthetic, no text, clean edges.";
   
-  const splashPrompt = "A high-resolution splash screen for a children's story app. In the dead center, a whimsical magical book is open with a soft golden glow. The background is a soft, out-of-focus magical jungle landscape with warm lighting and fireflies. Pixar character design style. Professional composition with the main subject strictly in the center and 50% empty space around edges.";
+  const splashPrompt = "A high-resolution splash screen for a children's story app. In the dead center, a whimsical magical book is open with a soft golden glow. The background is a soft, out-of-focus magical jungle landscape with warm lighting and fireflies. Pixar character design style. Include the text 'WonderStories' clearly in a beautiful, whimsical, child-friendly font at the bottom center. Professional composition with 50% empty space around edges.";
 
   console.log("🚀 Starting AI Asset Generation from scripts folder...");
   

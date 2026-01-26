@@ -15,17 +15,19 @@ fi
 echo "📦 Installing asset generator..."
 npm install @capacitor/assets --save-dev --legacy-peer-deps
 
-# 2. Check for source files
-if [ ! -f "icon-only.png" ] || [ ! -f "splash.png" ]; then
-  echo "⚠️  WARNING: Source files missing!"
-  echo "Please place 'icon-only.png' (1024x1024) and 'splash.png' (2732x2732) in the /app folder."
-  echo "Using placeholders for now so the build doesn't fail, but REPLACE THEM before submission."
-  # We won't generate if missing to avoid overwriting with defaults again
+# 2. Sync source files from assets/ to root for generator
+if [ ! -f "assets/icon-only.png" ] || [ ! -f "assets/splash.png" ]; then
+  echo "❌ ERROR: Source files missing in /app/assets/!"
+  echo "Please ensure 'icon-only.png' and 'splash.png' are in the /app/assets/ folder."
   exit 1
 fi
 
+echo "🚚 Syncing latest assets from /app/assets/..."
+cp assets/icon-only.png .
+cp assets/splash.png .
+
 # 3. Generate all Android assets
-echo "🚀 Generating Android icons and splash screens..."
+echo "🚀 Generating Android assets..."
 npx capacitor-assets generate --android
 
 echo ""
