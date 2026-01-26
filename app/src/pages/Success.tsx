@@ -269,9 +269,9 @@ export default function SuccessPage() {
                 </button>
                 <button
                   onClick={() => reportContent(1)}
-                  className="mt-4 w-full py-2 text-slate-600 hover:text-red-400 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                  className="mt-4 w-full py-2 text-slate-600 hover:text-red-400 text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 opacity-30 hover:opacity-100"
                 >
-                  <Flag size={12} /> Report Inappropriate Content
+                  <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Content
                 </button>
               </div>
             </div>

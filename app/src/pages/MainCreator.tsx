@@ -641,6 +641,38 @@ export default function MainCreator() {
     }
   };
 
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportData, setReportData] = useState({ pageNumber: 1, reason: '' });
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const reportContent = (pageNumber: number) => {
+    setReportData({ pageNumber, reason: '' });
+    setShowReportDialog(true);
+  };
+
+  const submitReport = async () => {
+    if (!reportData.reason.trim()) {
+      toast({ title: "Reason Required", description: "Please describe the issue.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmittingReport(true);
+    try {
+      await axios.post(`${API_URL}/report-content`, {
+        bookId: book?.bookId,
+        reporterEmail: user?.email || 'anonymous',
+        pageNumber: reportData.pageNumber,
+        reason: reportData.reason
+      });
+      setShowReportDialog(false);
+      toast({ title: "Incident Logged", description: "Our safety team has been alerted." });
+    } catch (e) {
+      toast({ title: "Submission Failed", description: "Please try again later.", variant: "destructive" });
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
   const deleteAccount = async () => {
     const confirmation = window.prompt('CRITICAL: This will permanently delete your account, all your stories, and all your images. This action cannot be undone.\n\nType "DELETE" to confirm:');
     
@@ -662,22 +694,7 @@ export default function MainCreator() {
     }
   };
 
-  const reportContent = async (pageNumber: number) => {
-    const reason = window.prompt('Please describe why you are reporting this content (e.g., offensive image, inappropriate text):');
-    if (!reason) return;
 
-    try {
-      await axios.post(`${API_URL}/report-content`, {
-        bookId: book?.bookId,
-        reporterEmail: user?.email || 'anonymous',
-        pageNumber,
-        reason
-      });
-      toast({ title: "Report Submitted", description: "Thank you. Our safety team will review this page." });
-    } catch (e) {
-      toast({ title: "Error", description: "Failed to submit report." });
-    }
-  };
 
   const renderSelect = (label: string, field: keyof typeof formData, choices: string[]) => (
     <div>
@@ -1145,9 +1162,9 @@ export default function MainCreator() {
                 <div className="pt-12 pb-4 flex justify-center">
                   <button
                     onClick={() => reportContent(1)}
-                    className="text-slate-600 hover:text-red-400 text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 opacity-50 hover:opacity-100"
+                    className="text-slate-600 hover:text-red-400 text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 opacity-20 hover:opacity-100"
                   >
-                    <Flag size={10} /> Report Inappropriate Story Content
+                    <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Story Content
                   </button>
                 </div>
               </div>
@@ -1330,9 +1347,9 @@ export default function MainCreator() {
                         <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg relative">
                           <button
                             onClick={() => reportContent(p.pageNumber)}
-                            className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1 bg-black/20 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/5"
+                            className="absolute top-4 right-4 text-[8px] font-black uppercase text-slate-600 hover:text-red-400 transition-colors flex items-center gap-1 opacity-20 hover:opacity-100"
                           >
-                            <Flag size={10} className="fill-current" /> Report Inappropriate Content
+                            <Flag size={8} className="text-red-500 fill-current" /> Report Inappropriate Content
                           </button>
                           <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
                         </div>
@@ -1535,10 +1552,10 @@ export default function MainCreator() {
                         // For bookshelf, we report the book generally (page 1 context)
                         reportContent(1); 
                       }}
-                      className="w-12 h-12 bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-xl transition-all flex items-center justify-center border border-white/10"
+                      className="w-12 h-12 bg-white/5 hover:bg-red-500/20 text-slate-500 hover:text-red-400 rounded-xl transition-all flex items-center justify-center border border-white/10 opacity-20 hover:opacity-100"
                       title="Report Inappropriate Content"
                     >
-                      <Flag size={16} />
+                      <Flag size={10} className="text-red-500 fill-current" />
                     </button>
                   </div>
                 </div>
@@ -1635,6 +1652,50 @@ export default function MainCreator() {
               Verify & Order
             </Button>
             <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Verification required for children's app safety</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ominous Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="max-w-md bg-slate-950 border-red-900/50 text-white rounded-[2rem] shadow-[0_0_50px_rgba(220,38,38,0.15)]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-red-500 text-center flex items-center justify-center gap-2">
+              <Flag size={24} className="fill-current" /> Safety Intervention
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-6 space-y-6">
+            <div className="bg-red-950/20 p-6 rounded-2xl border border-red-900/30 text-center">
+              <p className="text-red-200/70 text-xs font-bold uppercase tracking-widest leading-relaxed">
+                You are about to flag content as inappropriate. This action will trigger a formal human review of the story and associated AI models.
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-1">Nature of Concern</label>
+              <textarea 
+                value={reportData.reason}
+                onChange={(e) => setReportData({ ...reportData, reason: e.target.value })}
+                className="w-full h-32 bg-slate-900 rounded-2xl p-4 text-sm outline-none border-2 border-transparent focus:border-red-600/50 transition-all resize-none placeholder:text-slate-700"
+                placeholder="Describe the violation in detail..."
+              />
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button 
+                onClick={submitReport}
+                disabled={isSubmittingReport}
+                className="w-full h-16 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-lg shadow-xl shadow-red-900/20 active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {isSubmittingReport ? <Loader2 className="animate-spin" /> : "File Formal Report"}
+              </Button>
+              <button 
+                onClick={() => setShowReportDialog(false)}
+                className="w-full py-2 text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
