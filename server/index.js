@@ -1042,7 +1042,7 @@ app.get('/privacy', (req, res) => {
   try {
     const fs = require('fs');
     const path = require('path');
-    const policiesContent = fs.readFileSync(path.join(__dirname, '..', 'POLICIES.md'), 'utf8');
+    const policiesContent = fs.readFileSync(path.join(__dirname, 'POLICIES.md'), 'utf8');
     
     // Simple converter for basic markdown to HTML for the privacy page
     const htmlBody = policiesContent
