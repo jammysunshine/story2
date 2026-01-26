@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "^8.0.1",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.0.1",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.10.1",

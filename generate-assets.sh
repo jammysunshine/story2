@@ -13,7 +13,7 @@ if ! [ -x "$(command -v npx)" ]; then
 fi
 
 echo "📦 Installing asset generator..."
-npm install @capacitor/assets --save-dev
+npm install @capacitor/assets --save-dev --legacy-peer-deps
 
 # 2. Check for source files
 if [ ! -f "icon-only.png" ] || [ ! -f "splash.png" ]; then
