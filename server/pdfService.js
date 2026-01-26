@@ -127,7 +127,7 @@ async function generatePdf(db, bookId) {
   const browser = await puppeteer.launch({
     executablePath: chromePath,
     headless: 'new',
-    timeout: 60000,
+    timeout: 120000,
     dumpio: true,
     args: [
       '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
@@ -157,6 +157,7 @@ async function generatePdf(db, bookId) {
   try {
     logger.info('✅ [PDF TRACE] Browser launched successfully');
     const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(120000);
 
     page.on('requestfailed', request => {
       logger.warn(`❌ [PDF RESOURCE FAIL] ${request.url()} - ${request.failure()?.errorText}`);
@@ -192,7 +193,7 @@ async function generatePdf(db, bookId) {
 
     logger.info(`🎯 [PDF_DEBUG] Attempting to navigate to: ${fullTemplateUrl}`);
     const response = await page.goto(fullTemplateUrl, {
-      waitUntil: 'networkidle0',
+      waitUntil: 'domcontentloaded',
       timeout: 120000
     });
     logger.info(`🎯 [PDF_DEBUG] Navigation completed, URL is now: ${page.url()}`);
@@ -213,24 +214,37 @@ async function generatePdf(db, bookId) {
     await page.waitForSelector('.page', { timeout: 60000 });
     logger.info(`🎯 [PDF_DEBUG] Found .page selector successfully`);
 
-    logger.info('⏳ Waiting for all images to be fully decoded in browser memory...');
+    logger.info('⏳ Waiting for images to decode (15s limit per image)...');
     const bulkDecodeStatus = await page.evaluate(async () => {
       const images = Array.from(document.querySelectorAll('img'));
+      const timeout = (ms) => new Promise(res => setTimeout(() => res('timed_out'), ms));
+      
       const results = await Promise.allSettled(images.map(async img => {
         if (!img.src || img.src === 'none') return 'skipped';
-        await img.decode();
-        return 'decoded';
+        try {
+          // Race the decode against a 15s timer
+          const result = await Promise.race([
+            img.decode(),
+            timeout(15000)
+          ]);
+          return result === 'timed_out' ? 'timed_out' : 'decoded';
+        } catch (e) {
+          return 'failed';
+        }
       }));
-      return results.map(r => r.status === 'fulfilled' ? r.value : 'failed');
+      return results.map(r => r.status === 'fulfilled' ? r.value : 'error');
     });
 
     const decodedCount = bulkDecodeStatus.filter(s => s === 'decoded').length;
-    const failedDecode = bulkDecodeStatus.filter(s => s === 'failed').length;
+    const timedOutCount = bulkDecodeStatus.filter(s => s === 'timed_out').length;
+    const failedCount = bulkDecodeStatus.filter(s => s === 'failed' || s === 'error').length;
     
-    if (failedDecode > 0) {
-      logger.warn(`⚠️ ${failedDecode} images failed to load in Puppeteer!`);
+    logger.info(`📊 Image Decode Stats: Decoded=${decodedCount}, TimedOut=${timedOutCount}, Failed=${failedCount}`);
+    
+    if (timedOutCount > 0 || failedCount > 0) {
+      logger.warn(`⚠️ Some images failed to decode in time, proceeding anyway...`);
     } else {
-      logger.info('✅ All images loaded successfully in browser.');
+      logger.info('✅ All images decoded successfully.');
     }
 
     logger.info(`📖 Capturing ${totalActualPages} total pages (Title + ${storyPageCount} story parts)...`);
