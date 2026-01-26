@@ -39,7 +39,7 @@ async function sendStoryEmail(email, bookTitle, pdfUrl) {
 
 async function sendShippingEmail(email, bookTitle, trackingUrl) {
   const mailOptions = {
-    from: `"AI StoryTime" <${process.env.SMTP_USER}>`,
+    from: `"WonderStories AI" <${process.env.SMTP_USER}>`,
     to: email,
     subject: `📦 Your Book has Shipped: ${bookTitle}`,
     html: `

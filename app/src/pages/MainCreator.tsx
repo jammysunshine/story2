@@ -1028,12 +1028,12 @@ export default function MainCreator() {
                   </div>
                 ))}
                 
-                <div className="pt-8 border-t border-white/5 flex justify-center">
+                <div className="pt-12 pb-4 flex justify-center">
                   <button
                     onClick={() => reportContent(1)}
-                    className="text-slate-600 hover:text-red-400 text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2"
+                    className="text-slate-600 hover:text-red-400 text-[8px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 opacity-50 hover:opacity-100"
                   >
-                    <Flag size={12} /> Report Inappropriate Story Content
+                    <Flag size={10} /> Report Inappropriate Story Content
                   </button>
                 </div>
               </div>
@@ -1242,7 +1242,7 @@ export default function MainCreator() {
                         <ExternalLink size={20} />
                         View Digital PDF
                       </button>
-                      <p className="text-center text-[10px] text-slate-500 font-bold uppercase tracking-widest">Digital PDF Edition: ${PDF_COST} {BASE_CURRENCY}</p>
+                      <p className="text-center text-[8px] text-slate-500 font-bold uppercase tracking-widest">Digital copy included with every physical book</p>
                     </div>
                   )}
 
