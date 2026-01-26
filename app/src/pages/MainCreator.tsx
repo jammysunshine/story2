@@ -1456,7 +1456,7 @@ export default function MainCreator() {
                     <Trash2 size={12} className="group-hover:animate-bounce" /> Delete My Account & Data
                   </button>
                   <a href="/privacy" target="_blank" className="block text-[8px] font-black uppercase text-slate-600 hover:text-primary transition-colors text-center tracking-widest">
-                    Privacy Policy & AI Safety
+                    Terms & Privacy Policy
                   </a>
                 </div>
               ) : (

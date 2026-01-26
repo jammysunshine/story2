@@ -1036,37 +1036,43 @@ app.post('/api/create-checkout', async (req, res) => {
 });
 
 app.get('/privacy', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Privacy Policy | WonderStories AI</title>
-      <style>
-        body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; }
-        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        h2 { margin-top: 30px; }
-      </style>
-    </head>
-    <body>
-      <h1>Privacy Policy & AI Safety</h1>
-      <p>Last updated: January 2026</p>
-      
-      <h2>1. Information We Collect</h2>
-      <p>We collect your email address and name via Google Sign-In to manage your book library. Photos uploaded for character sync are processed via Google Gemini and are not shared with third parties except for the purpose of story generation.</p>
-      
-      <h2>2. Data Deletion</h2>
-      <p>You can delete your account and all associated data at any time from the "Account" tab within the app.</p>
-      
-      <h2>3. AI Safety</h2>
-      <p>Our stories and images are generated using Google Gemini. We have implemented strict safety filters to ensure all content is appropriate for children. If you encounter any offensive content, please use the "Report" button on the story page.</p>
-      
-      <h2>4. Contact</h2>
-      <p>For any questions, please contact us via the app feedback system.</p>
-      
-      <p style="margin-top: 50px; color: #999; font-size: 12px;">© 2026 WonderStories AI</p>
-    </body>
-    </html>
-  `);
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const policiesContent = fs.readFileSync(path.join(__dirname, '..', 'POLICIES.md'), 'utf8');
+    
+    // Simple converter for basic markdown to HTML for the privacy page
+    const htmlBody = policiesContent
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>');
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Terms & Privacy | WonderStories AI</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 40px; color: #333; }
+          h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; color: #000; }
+          h2 { margin-top: 30px; color: #444; border-left: 4px solid #6366f1; padding-left: 15px; }
+          .footer { margin-top: 50px; color: #999; font-size: 12px; text-align: center; border-top: 1px solid #eee; padding-top: 20px; }
+        </style>
+      </head>
+      <body>
+        ${htmlBody}
+        <div class="footer">
+          © 2026 WonderStories AI | Empowering parents to create magical moments.
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    logger.error('Failed to read POLICIES.md', error);
+    res.status(500).send('Privacy policy temporarily unavailable.');
+  }
 });
 
 // --- USER DATA & SAFETY ROUTES ---
