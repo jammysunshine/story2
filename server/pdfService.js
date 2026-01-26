@@ -131,7 +131,12 @@ async function generatePdf(db, bookId) {
     dumpio: true,
     args: [
       '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-      '--disable-gpu', '--no-zygote', '--single-process', '--no-first-run',
+      '--disable-gpu', '--no-zygote', '--no-first-run',
+      '--disable-crash-reporter',
+      '--disable-dbus',
+      '--disable-dev-conflicts',
+      '--disable-speech-api',
+      '--disable-sync',
       '--disable-extensions', '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
       '--disable-web-security', `--user-data-dir=/tmp/chrome-${crypto.randomUUID()}`,
