@@ -1,23 +1,11 @@
 import { Palette, FileDown, Flag, BookOpen } from 'lucide-react';
 import { Badge } from '../ui/badge';
-
-interface BookPage {
-  pageNumber: number;
-  imageUrl?: string;
-}
-
-interface Book {
-  _id: string;
-  title: string;
-  status: string;
-  pdfUrl?: string;
-  pages?: BookPage[];
-}
+import type { Book } from '../../types/book';
 
 interface LibraryGridProps {
   library: Book[];
   onSelectBook: (book: Book) => void;
-  onReportContent: (pageNumber: number, bookId: string) => void;
+  onReportContent: (pageNumber: number, bookId?: string) => void;
 }
 
 export function LibraryGrid({ library, onSelectBook, onReportContent }: LibraryGridProps) {

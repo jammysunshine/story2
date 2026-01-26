@@ -73,31 +73,7 @@ const randomOccasions = ['Everyday Adventure', 'Birthday Party', 'Christmas Eve'
 
 const getRandomItem = (array: string[]) => array[Math.floor(Math.random() * array.length)];
 
-interface BookPage {
-  pageNumber: number;
-  text: string;
-  prompt: string;
-  imageUrl?: string;
-  url?: string;
-}
-
-interface Book {
-  _id?: string;
-  bookId?: string;
-  title?: string;
-  childName?: string;
-  pages?: BookPage[];
-  status?: string;
-  heroBible?: string;
-  animalBible?: string;
-  finalPrompt?: string;
-  photoUrl?: string;
-  pdfUrl?: string;
-  isDigitalUnlocked?: boolean;
-  userId?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
+import type { Book, BookPage } from '../types/book';
 
 export default function MainCreator() {
   const { toast } = useToast()
@@ -110,7 +86,7 @@ export default function MainCreator() {
   const isHydrated = useRef(false);
   const [pdfReady, setPdfReady] = useState(false);
   const [showPdfToast, setShowPdfToast] = useState(false);
-  const [library, setLibrary] = useState<any[]>([]);
+  const [library, setLibrary] = useState<Book[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
 
   // Calculate progress based on images generated

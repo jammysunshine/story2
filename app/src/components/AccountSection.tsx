@@ -1,5 +1,6 @@
 import { User as CircleUser, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
+import type { Book } from '../types/book';
 
 interface User {
   name: string;
@@ -19,7 +20,7 @@ interface User {
 interface AccountSectionProps {
   user: User | null;
   orders: any[];
-  library: any[];
+  library: Book[];
   onLogout: () => void;
   onDeleteRequest: () => void;
   onLogin: () => void;

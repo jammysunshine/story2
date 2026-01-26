@@ -1,26 +1,7 @@
 import { Palette, Lock, Flag, ExternalLink, Loader2, FileDown, FileText, Package } from 'lucide-react';
 import { MagicGlow } from '../MagicGlow';
 import { Button } from '../ui/button';
-
-interface BookPage {
-  pageNumber: number;
-  text: string;
-  imageUrl?: string;
-}
-
-interface Book {
-  bookId?: string;
-  status: string;
-  pdfUrl?: string;
-  pages?: BookPage[];
-}
-
-interface LibraryBook {
-  _id: string;
-  title: string;
-  status: string;
-  pdfUrl?: string;
-}
+import type { Book, BookPage } from '../../types/book';
 
 interface Step3PaintingProps {
   book: Book;
@@ -33,7 +14,7 @@ interface Step3PaintingProps {
   checkoutLoading: boolean;
   bookCost: string;
   baseCurrency: string;
-  library: LibraryBook[];
+  library: Book[];
 }
 
 export function Step3Painting({

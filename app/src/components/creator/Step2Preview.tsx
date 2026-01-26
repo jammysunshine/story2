@@ -1,15 +1,5 @@
 import { Sparkles, Loader2, Flag } from 'lucide-react';
-
-interface BookPage {
-  pageNumber: number;
-  text: string;
-}
-
-interface Book {
-  bookId?: string;
-  title?: string;
-  pages?: BookPage[];
-}
+import type { Book, BookPage } from '../../types/book';
 
 interface Step2PreviewProps {
   book: Book;

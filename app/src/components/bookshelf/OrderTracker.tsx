@@ -1,4 +1,5 @@
 import { Package, Palette, ExternalLink } from 'lucide-react';
+import type { Book } from '../../types/book';
 
 interface Order {
   _id: string;
@@ -6,12 +7,6 @@ interface Order {
   status: string;
   amount: number;
   trackingUrl?: string;
-}
-
-interface Book {
-  _id: string;
-  title: string;
-  status: string;
 }
 
 interface OrderTrackerProps {
