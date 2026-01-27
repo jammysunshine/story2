@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle2, ArrowRight, Loader2, Receipt, FileDown, Star, BookOpen, Sparkles, User as CircleUser, FileText, Flag } from 'lucide-react';
 import axios from 'axios';
@@ -13,6 +13,7 @@ export default function SuccessPage() {
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const navigate = useNavigate();
 
   const reportContent = async (pageNumber: number) => {
     const reason = window.prompt('Please describe why you are reporting this content (e.g., offensive image, inappropriate text):');
@@ -40,7 +41,7 @@ export default function SuccessPage() {
 
   const navigateToTab = (tab: string) => {
     localStorage.setItem('activeTab', tab);
-    window.location.href = '/';
+    navigate('/');
   };
 
   const MagicGlow = ({ color = 'pink' }: { color?: 'pink' | 'amber' | 'blue' | 'purple' | 'green' }) => {
