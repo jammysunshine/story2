@@ -135,8 +135,40 @@ export function Step3Painting({
           </div>
           <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">On Its Way To You!</p>
         </div>
+      ) : book.status === 'pdf_ready' ? (
+        // Show the completed book preview when PDF is ready
+        <>
+          <div className="text-center">
+            <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Story <br /> Is Complete!</h2>
+            <p className="text-green-400 font-bold mt-4 uppercase tracking-widest text-xs">✨ High-Resolution PDF Ready</p>
+          </div>
+
+          <div className="space-y-20">
+            {book.pages?.map((p: BookPage, i: number) => (
+              <div key={`${i}-${p.imageUrl || 'no-image'}`} className="space-y-6">
+                <div className="aspect-square bg-slate-800 rounded-[2.5rem] overflow-hidden shadow-2xl border-8 border-white ring-1 ring-black/10 relative">
+                  {p.imageUrl && !p.imageUrl.includes('placeholder') ? (
+                    <img
+                      src={p.imageUrl}
+                      className="w-full h-full object-cover"
+                      alt={`Page ${i + 1}`}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-slate-900 animate-pulse">
+                      <Palette className="text-slate-700 w-12 h-12" />
+                      <p className="text-[10px] font-black uppercase text-slate-700 tracking-widest text-center px-8">Loading illustration...</p>
+                    </div>
+                  )}
+                </div>
+                <div className="bg-white/5 backdrop-blur-md p-8 rounded-[2rem] border border-white/10 text-center shadow-lg relative">
+                  <p className="text-xl font-medium text-slate-200 leading-relaxed italic">"{p.text}"</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       ) : (
-        // Show the book preview with individual page placeholders
+        // Show the teaser preview for unpaid/generating books
         <>
           <div className="text-center">
             <h2 className="text-4xl font-black uppercase tracking-tighter text-white leading-none">Your Adventure <br /> Is Coming To Life</h2>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Sparkles, Wand2, Loader2, BookOpen, Lock, Palette, Package, ExternalLink, Camera, Trash2, FileText, User as CircleUser, FileDown, Flag } from 'lucide-react'
 import axios from 'axios'
 import {
@@ -381,7 +381,7 @@ export default function MainCreator() {
     occasion: 'Everyday Adventure'
   })
 
-  const randomizeFormData = () => {
+  const randomizeFormData = useCallback(() => {
     setFormData({
       childName: getRandomItem(randomNames),
       age: (Math.floor(Math.random() * 23) + 3).toString(),
@@ -399,7 +399,7 @@ export default function MainCreator() {
       title: "✨ Magic Applied!",
       description: "We've picked some fun traits for you.",
     });
-  };
+  }, [toast, setFormData]);
 
   const pollingRef = useRef<number | null>(null);
 
@@ -453,9 +453,9 @@ export default function MainCreator() {
           });
 
           // Stop polling if we reached a final state
-          // NOTE: We don't stop on 'paid', 'preview', or 'generating' anymore since image generation happens after these statuses
-          // We continue polling during image generation phases
-          if (['illustrated', 'printing', 'printing_test', 'shipped'].includes(newStatus) ||
+          // We removed 'illustrated' and 'printing' from this list because 
+          // we need to keep polling until the PDF is ready (pdf_ready)
+          if (['pdf_ready', 'shipped'].includes(newStatus) ||
             (newStatus === 'teaser_ready' && calculateProgress() === 100)) {
             console.warn('🏁 STOPPING POLL. Final Status Reached:', newStatus);
             if (pollingRef.current) {
@@ -498,7 +498,7 @@ export default function MainCreator() {
     }
   }
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -526,7 +526,7 @@ export default function MainCreator() {
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [toast, setIsUploading, setPhotoUrl]);
 
   const fetchLibrary = async (explicitToken?: string) => {
     const token = explicitToken || user?.token;
@@ -544,7 +544,7 @@ export default function MainCreator() {
     }
   };
 
-  const generateStory = async () => {
+  const generateStory = useCallback(async () => {
     console.warn('🚀 FRONTEND: generateStory CALLED');
     console.warn('Payload:', { ...formData, photoUrl, email: user?.email });
     setLoading(true)
@@ -561,7 +561,7 @@ export default function MainCreator() {
       alert(`Failed to generate story: ${errorMessage}`)
     }
     finally { setLoading(false) }
-  }
+  }, [formData, photoUrl, user, setBook, setStep, setLoading]);
 
   const startPainting = async () => {
     console.warn('🎨 FRONTEND: startPainting CALLED');
@@ -612,12 +612,12 @@ export default function MainCreator() {
   const [parentalAnswer, setParentalGateAnswer] = useState('');
   const [parentalProblem, setParentalGateProblem] = useState({ q: '', a: 0 });
 
-  const startParentalGate = () => {
+  const startParentalGate = useCallback(() => {
     const num1 = Math.floor(Math.random() * 10) + 5;
     const num2 = Math.floor(Math.random() * 10) + 5;
     setParentalGateProblem({ q: `${num1} + ${num2}`, a: num1 + num2 });
     setShowParentalGate(true);
-  };
+  }, [setShowParentalGate, setParentalGateProblem]);
 
   const verifyParentalGate = async () => {
     if (parseInt(parentalAnswer) === parentalProblem.a) {
